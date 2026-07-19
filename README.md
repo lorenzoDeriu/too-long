@@ -8,25 +8,6 @@ The audio never leaves your Mac.
 
 ## How to install
 
-> [!IMPORTANT]
-> The signed Homebrew release is not live yet. Until it is available, install Too Long from source using the instructions below.
-
-### Homebrew
-
-Once the first signed and notarized release is published, installation will take one command:
-
-```sh
-brew install --cask lorenzoDeriu/tap/too-long
-```
-
-Homebrew will then keep Too Long current with:
-
-```sh
-brew upgrade --cask too-long
-```
-
-### Build from source
-
 Building Too Long currently requires:
 
 - macOS 26 or newer
