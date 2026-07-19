@@ -6,6 +6,59 @@ Too Long is an open-source, native macOS menu-bar app for everyday voice notes. 
 
 The audio never leaves your Mac.
 
+## How to install
+
+> [!IMPORTANT]
+> The signed Homebrew release is not live yet. Until it is available, install Too Long from source using the instructions below.
+
+### Homebrew
+
+Once the first signed and notarized release is published, installation will take one command:
+
+```sh
+brew install --cask lorenzoDeriu/tap/too-long
+```
+
+Homebrew will then keep Too Long current with:
+
+```sh
+brew upgrade --cask too-long
+```
+
+### Build from source
+
+Building Too Long currently requires:
+
+- macOS 26 or newer
+- Xcode 26 or newer
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+
+Clone the repository and generate the Xcode project:
+
+```sh
+git clone https://github.com/lorenzoDeriu/too-long.git
+cd too-long
+brew install xcodegen
+xcodegen generate
+```
+
+Then build and launch the app:
+
+```sh
+xcodebuild \
+  -project TooLong.xcodeproj \
+  -scheme TooLong \
+  -configuration Debug \
+  -derivedDataPath DerivedData \
+  build
+
+open "DerivedData/Build/Products/Debug/Too Long.app"
+```
+
+Alternatively, open `TooLong.xcodeproj` in Xcode and run the `TooLong` scheme. Too Long has no Dock icon; after launch, look for it in the menu bar.
+
+The macOS 26 requirement comes from the Apple speech and Liquid Glass APIs used by the app.
+
 ## Features
 
 - Native SwiftUI menu-bar experience with Liquid Glass
@@ -43,40 +96,6 @@ Too Long currently supports:
 - Spanish
 
 In automatic mode, Too Long compares a short sample locally using compatible Apple speech languages installed on the Mac. If detection is unreliable, choose the language explicitly in Settings. Availability depends on the speech assets supported by the current Mac.
-
-## Requirements
-
-- macOS 26 or newer
-- Xcode 26 or newer
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
-
-The macOS 26 requirement comes from the Apple speech and Liquid Glass APIs used by the app.
-
-## Build from source
-
-Clone the repository and generate the Xcode project:
-
-```sh
-git clone https://github.com/lorenzoDeriu/too-long.git
-cd too-long
-brew install xcodegen
-xcodegen generate
-```
-
-Then build and launch Too Long:
-
-```sh
-xcodebuild \
-  -project TooLong.xcodeproj \
-  -scheme TooLong \
-  -configuration Debug \
-  -derivedDataPath DerivedData \
-  build
-
-open "DerivedData/Build/Products/Debug/Too Long.app"
-```
-
-You can also open `TooLong.xcodeproj` in Xcode and run the `TooLong` scheme. Too Long has no Dock icon; after launch, look for it in the menu bar.
 
 ## Use Too Long
 
@@ -137,10 +156,6 @@ TooLong/
 ```
 
 `project.yml` is the source of truth for the generated Xcode project.
-
-## Installation
-
-A signed and notarized GitHub release and Homebrew Cask are planned. Until then, build the app from source using the instructions above.
 
 ## Contributing
 
