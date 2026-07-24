@@ -27,11 +27,6 @@ struct TranscriptSegment: Codable, Equatable, Identifiable, Sendable {
 struct VoiceRecap: Codable, Equatable, Sendable {
     let inShort: String
     let worthReplyingTo: [String]
-    let suggestedReply: String
-
-    var hasSuggestedReply: Bool {
-        !suggestedReply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
 }
 
 struct VoiceNote: Codable, Equatable, Identifiable, Sendable {

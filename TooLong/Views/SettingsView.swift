@@ -22,18 +22,13 @@ struct SettingsView: View {
                 GlassEffectContainer(spacing: 20) {
                     VStack(alignment: .leading, spacing: 22) {
                         HStack(spacing: 14) {
-                            TinyWaveform()
-                                .padding(12)
-                                .glassEffect(
-                                    .clear.tint(TooLongStyle.tomato.opacity(0.12)),
-                                    in: Circle()
-                                )
+                            AppLogoMark(width: 74)
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Too Long")
-                                    .font(.system(size: 28, weight: .black, design: .rounded))
+                                    .font(.system(size: 28, weight: .semibold))
                                 Text("Your voice-note shortcut, set up your way.")
-                                    .font(.system(.body, design: .rounded))
+                                    .font(.body)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -60,11 +55,14 @@ struct SettingsView: View {
 
                             if settings.provider == .none {
                                 Label("Recaps are off. Voice notes are still transcribed locally.", systemImage: "checkmark.shield.fill")
-                                    .font(.system(.callout, design: .rounded))
-                                    .foregroundStyle(TooLongStyle.leaf)
+                                    .font(.callout)
+                                    .foregroundStyle(TooLongStyle.success)
                             } else {
                                 VStack(alignment: .leading, spacing: 9) {
-                                    SecureField("\(settings.provider.displayName) API key", text: $apiKey)
+                                    Text("\(settings.provider.displayName) API key")
+                                        .font(.callout.weight(.semibold))
+
+                                    SecureField("Paste API key", text: $apiKey)
                                         .textFieldStyle(.roundedBorder)
 
                                     HStack {
@@ -96,7 +94,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
 
                                 Toggle("Show things worth replying to", isOn: $settings.includeReplyPoints)
-                                Toggle("Draft a reply automatically", isOn: $settings.includeReplyDraft)
 
                                 DisclosureGroup("Model") {
                                     if settings.provider == .openAI {
@@ -130,7 +127,8 @@ struct SettingsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             Label(title, systemImage: icon)
-                .font(.system(.headline, design: .rounded, weight: .bold))
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(TooLongStyle.indigo)
             VStack(alignment: .leading, spacing: 12, content: content)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
@@ -149,11 +147,11 @@ struct SettingsView: View {
                 .font(.caption)
         case .success(let message):
             Label(message, systemImage: "checkmark.circle.fill")
-                .foregroundStyle(TooLongStyle.leaf)
+                .foregroundStyle(TooLongStyle.success)
                 .font(.caption)
         case .failure(let message):
             Label(message, systemImage: "exclamationmark.circle.fill")
-                .foregroundStyle(TooLongStyle.tomato)
+                .foregroundStyle(TooLongStyle.danger)
                 .font(.caption)
         }
     }
@@ -161,10 +159,10 @@ struct SettingsView: View {
     private func privacyRow(_ title: String, detail: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(.callout, design: .rounded, weight: .semibold))
+                .font(.callout.weight(.semibold))
             Spacer()
             Text(detail)
-                .font(.system(.callout, design: .rounded))
+                .font(.callout)
                 .foregroundStyle(.secondary)
         }
     }

@@ -50,8 +50,7 @@ actor AIRecapService {
         provider: AIProvider,
         apiKey: String,
         model: String,
-        includeReplyPoints: Bool,
-        includeReplyDraft: Bool
+        includeReplyPoints: Bool
     ) async throws -> VoiceRecap {
         guard provider != .none else { throw AIRecapError.providerMissing }
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -66,16 +65,14 @@ actor AIRecapService {
                 transcript: transcript,
                 apiKey: apiKey,
                 model: model,
-                includeReplyPoints: includeReplyPoints,
-                includeReplyDraft: includeReplyDraft
+                includeReplyPoints: includeReplyPoints
             )
         case .anthropic:
             return try await generateWithAnthropic(
                 transcript: transcript,
                 apiKey: apiKey,
                 model: model,
-                includeReplyPoints: includeReplyPoints,
-                includeReplyDraft: includeReplyDraft
+                includeReplyPoints: includeReplyPoints
             )
         }
     }
@@ -84,8 +81,7 @@ actor AIRecapService {
         transcript: String,
         apiKey: String,
         model: String,
-        includeReplyPoints: Bool,
-        includeReplyDraft: Bool
+        includeReplyPoints: Bool
     ) async throws -> VoiceRecap {
         var request = URLRequest(url: URL(string: "https://api.openai.com/v1/responses")!)
         request.httpMethod = "POST"
@@ -94,10 +90,7 @@ actor AIRecapService {
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "model": model,
             "store": false,
-            "instructions": instructions(
-                includeReplyPoints: includeReplyPoints,
-                includeReplyDraft: includeReplyDraft
-            ),
+            "instructions": instructions(includeReplyPoints: includeReplyPoints),
             "input": transcript,
             "text": ["format": openAIStructuredOutputFormat],
         ])
@@ -119,8 +112,7 @@ actor AIRecapService {
         transcript: String,
         apiKey: String,
         model: String,
-        includeReplyPoints: Bool,
-        includeReplyDraft: Bool
+        includeReplyPoints: Bool
     ) async throws -> VoiceRecap {
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
         request.httpMethod = "POST"
@@ -129,10 +121,7 @@ actor AIRecapService {
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "model": model,
             "max_tokens": 900,
-            "system": instructions(
-                includeReplyPoints: includeReplyPoints,
-                includeReplyDraft: includeReplyDraft
-            ),
+            "system": instructions(includeReplyPoints: includeReplyPoints),
             "messages": [["role": "user", "content": transcript]],
             "output_config": ["format": anthropicStructuredOutputFormat],
         ])
@@ -175,26 +164,22 @@ actor AIRecapService {
                         "description": "Real questions, plans, or details the recipient may want to answer.",
                         "items": ["type": "string"],
                     ],
-                    "suggestedReply": [
-                        "type": "string",
-                        "description": "A natural reply draft, or an empty string when no draft was requested.",
-                    ],
                 ],
-                "required": ["inShort", "worthReplyingTo", "suggestedReply"],
+                "required": ["inShort", "worthReplyingTo"],
                 "additionalProperties": false,
         ]
     }
 
-    private func instructions(includeReplyPoints: Bool, includeReplyDraft: Bool) -> String {
+    private func instructions(includeReplyPoints: Bool) -> String {
         """
         You help someone catch up on an everyday voice note from a friend, family member, or colleague.
         Sound warm, natural, and informal. Never turn it into meeting minutes or use corporate language.
         Stay faithful to the transcript. Do not invent facts, questions, plans, or emotions.
         Write in the same language as the transcript.
+        Do not draft, suggest, or imply a reply anywhere in the output. Do not address the sender.
 
         inShort: two to four short sentences capturing what the person actually wanted to say.
         worthReplyingTo: \(includeReplyPoints ? "up to four genuine questions, plans, or details worth answering" : "always return an empty array").
-        suggestedReply: \(includeReplyDraft ? "a brief, natural reply that the recipient could edit and send" : "always return an empty string").
         """
     }
 

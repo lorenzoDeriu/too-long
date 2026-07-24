@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 struct MenuBarContentView: View {
     @Environment(AppModel.self) private var model
+    @State private var isChoosingFile = false
+    @State private var activeOpenPanel: NSOpenPanel?
 
     var body: some View {
         ZStack {
@@ -24,6 +26,7 @@ struct MenuBarContentView: View {
                                 FailureView()
                             case .idle, .ready:
                                 EmptyStateView(
+                                    isChoosingFile: isChoosingFile,
                                     chooseFile: chooseFile,
                                     processFile: { model.process(fileURL: $0) }
                                 )
@@ -40,7 +43,9 @@ struct MenuBarContentView: View {
     }
 
     private func chooseFile() {
-        NSApp.activate(ignoringOtherApps: true)
+        guard !isChoosingFile else { return }
+
+        let parentWindow = NSApp.keyWindow ?? NSApp.windows.first(where: \.isVisible)
         let panel = NSOpenPanel()
         panel.title = "Choose a voice note"
         panel.prompt = "Choose Voice Note"
@@ -50,19 +55,38 @@ struct MenuBarContentView: View {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.process(fileURL: url)
+        isChoosingFile = true
+        activeOpenPanel = panel
+
+        let handleSelection: (NSApplication.ModalResponse) -> Void = { response in
+            isChoosingFile = false
+            activeOpenPanel = nil
+
+            if response == .OK, let url = panel.url {
+                model.process(fileURL: url)
+            }
+
+            NSApp.activate(ignoringOtherApps: true)
+            parentWindow?.makeKeyAndOrderFront(nil)
+        }
+
+        // MenuBarExtra uses a transient window. Attaching a sheet to it can orphan
+        // the panel when macOS dismisses that window, leaving this state stuck.
+        // Present the picker independently so its completion always fires.
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin(completionHandler: handleSelection)
+        panel.makeKeyAndOrderFront(nil)
     }
 
     private var header: some View {
-        HStack(spacing: 11) {
-            TinyWaveform(active: model.phase.isWorking)
+        HStack(spacing: 12) {
+            AppLogoMark(width: 58)
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Too Long")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                Text("for voice notes that got away")
-                    .font(.system(.caption, design: .rounded))
+                    .font(.system(size: 20, weight: .semibold))
+                Text("Voice notes, shortened locally")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -104,7 +128,7 @@ struct MenuBarContentView: View {
     private var footer: some View {
         HStack {
             Label("Audio stays on this Mac", systemImage: "lock.fill")
-                .font(.system(.caption2, design: .rounded, weight: .medium))
+                .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
 
             Spacer()
@@ -125,6 +149,7 @@ struct MenuBarContentView: View {
 }
 
 private struct EmptyStateView: View {
+    let isChoosingFile: Bool
     let chooseFile: () -> Void
     let processFile: (URL) -> Void
     @State private var isDropTargeted = false
@@ -136,41 +161,48 @@ private struct EmptyStateView: View {
             VStack(spacing: 17) {
                 Image(systemName: "waveform.badge.plus")
                     .font(.system(size: 39, weight: .medium))
-                    .foregroundStyle(TooLongStyle.tomato)
+                    .foregroundStyle(TooLongStyle.indigo)
                     .padding(15)
                     .glassEffect(
-                        .clear.tint(TooLongStyle.tomato.opacity(0.12)),
+                        .clear.tint(TooLongStyle.indigo.opacity(0.12)),
                         in: Circle()
                     )
 
                 VStack(spacing: 7) {
                     Text("Drop the long version.")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(.system(size: 24, weight: .semibold))
                     Text("A voice note goes in.\nThe useful bits come out.")
                         .multilineTextAlignment(.center)
-                        .font(.system(.body, design: .rounded))
+                        .font(.body)
                         .foregroundStyle(.secondary)
                 }
 
-                Button("Choose a voice note", action: chooseFile)
+                Button(action: chooseFile) {
+                    Label(
+                        isChoosingFile ? "Choosing a file…" : "Choose a voice note",
+                        systemImage: isChoosingFile ? "ellipsis" : "folder"
+                    )
+                }
                     .buttonStyle(PrimaryButtonStyle())
+                    .disabled(isChoosingFile)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(28)
             .liquidPanel(
-                tint: isDropTargeted ? TooLongStyle.tomato.opacity(0.20) : nil,
+                tint: isDropTargeted ? TooLongStyle.indigo.opacity(0.18) : nil,
                 cornerRadius: 34,
                 interactive: true
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 34, style: .continuous)
                     .strokeBorder(
-                        isDropTargeted ? TooLongStyle.tomato.opacity(0.85) : .primary.opacity(0.10),
+                        isDropTargeted ? TooLongStyle.indigo.opacity(0.85) : .primary.opacity(0.10),
                         style: StrokeStyle(lineWidth: 1.5, dash: [7, 7])
                     )
             }
             .frame(height: 330)
             .dropDestination(for: URL.self) { urls, _ in
+                guard !isChoosingFile else { return false }
                 guard let url = urls.first else { return false }
                 processFile(url)
                 return true
@@ -180,9 +212,9 @@ private struct EmptyStateView: View {
 
             VStack(spacing: 4) {
                 Label("Transcribed locally", systemImage: "apple.logo")
-                    .font(.system(.callout, design: .rounded, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                 Text("No account. No upload. No drama.")
-                    .font(.system(.caption, design: .rounded))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -203,9 +235,9 @@ private struct ProcessingView: View {
 
             VStack(spacing: 7) {
                 Text(processingTitle)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.system(size: 22, weight: .semibold))
                 Text(processingDetail)
-                    .font(.system(.callout, design: .rounded))
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -213,7 +245,7 @@ private struct ProcessingView: View {
             if model.phase == .transcribing || model.phase == .detectingLanguage {
                 ProgressView(value: model.progress)
                     .progressViewStyle(.linear)
-                    .tint(TooLongStyle.tomato)
+                    .tint(TooLongStyle.aqua)
                     .frame(width: 230)
             } else {
                 ProgressView()
@@ -254,9 +286,9 @@ private struct FailureView: View {
             Spacer()
             Image(systemName: "waveform.slash")
                 .font(.system(size: 43))
-                .foregroundStyle(TooLongStyle.tomato)
-            Text("That one didn't land.")
-                .font(.system(size: 23, weight: .bold, design: .rounded))
+                .foregroundStyle(TooLongStyle.danger)
+            Text("That file couldn’t be transcribed.")
+                .font(.system(size: 23, weight: .semibold))
             Text(model.errorMessage ?? "Try another audio file.")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -266,7 +298,7 @@ private struct FailureView: View {
             Spacer()
         }
         .padding(28)
-        .liquidPanel(tint: TooLongStyle.tomato.opacity(0.08), cornerRadius: 30)
+        .liquidPanel(tint: TooLongStyle.danger.opacity(0.08), cornerRadius: 30)
         .padding(24)
     }
 }

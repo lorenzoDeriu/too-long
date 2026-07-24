@@ -8,7 +8,7 @@ final class AppSettings {
         static let provider = "aiProvider"
         static let automaticRecaps = "automaticRecaps"
         static let includeReplyPoints = "includeReplyPoints"
-        static let includeReplyDraft = "includeReplyDraft"
+        static let retiredIncludeReplyDraft = "includeReplyDraft"
         static let language = "transcriptionLanguage"
         static let languageSelectionVersion = "transcriptionLanguageSelectionVersion"
         static let openAIModel = "openAIModel"
@@ -29,10 +29,6 @@ final class AppSettings {
         didSet { defaults.set(includeReplyPoints, forKey: Key.includeReplyPoints) }
     }
 
-    var includeReplyDraft: Bool {
-        didSet { defaults.set(includeReplyDraft, forKey: Key.includeReplyDraft) }
-    }
-
     var language: TranscriptionLanguage {
         didSet { defaults.set(language.rawValue, forKey: Key.language) }
     }
@@ -50,7 +46,7 @@ final class AppSettings {
         provider = AIProvider(rawValue: defaults.string(forKey: Key.provider) ?? "") ?? .none
         automaticRecaps = defaults.object(forKey: Key.automaticRecaps) as? Bool ?? true
         includeReplyPoints = defaults.object(forKey: Key.includeReplyPoints) as? Bool ?? true
-        includeReplyDraft = defaults.object(forKey: Key.includeReplyDraft) as? Bool ?? false
+        defaults.removeObject(forKey: Key.retiredIncludeReplyDraft)
         if defaults.integer(forKey: Key.languageSelectionVersion) < 1 {
             language = .automatic
             defaults.set(TranscriptionLanguage.automatic.rawValue, forKey: Key.language)

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="4096"
+    height="4096"
+    viewBox="0 0 1024 1024"
+    fill="none"
+>
+    <defs>
+        <linearGradient
+            id="wave"
+            x1="104"
+            y1="236"
+            x2="918"
+            y2="748"
+            gradientUnits="userSpaceOnUse"
+        >
+            <stop offset="0" stop-color="#7167FF"/>
+            <stop offset="0.54" stop-color="#625BFF"/>
+            <stop offset="1" stop-color="#4F7BFF"/>
+        </linearGradient>
+        <linearGradient
+            id="accent"
+            x1="756"
+            y1="486"
+            x2="932"
+            y2="538"
+            gradientUnits="userSpaceOnUse"
+        >
+            <stop offset="0" stop-color="#2BE4BE"/>
+            <stop offset="1" stop-color="#21CAD8"/>
+        </linearGradient>
+    </defs>
+
+    <path
+        d="
+            M 110 510
+            C 178 510, 181 368, 242 368
+            C 307 368, 252 725, 326 725
+            C 405 725, 347 220, 412 220
+            C 486 220, 425 770, 499 770
+            C 567 770, 500 430, 560 430
+            C 609 430, 611 510, 696 510
+        "
+        stroke="url(#wave)"
+        stroke-width="80"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+    />
+
+    <rect x="756" y="398" width="176" height="52" rx="26" fill="url(#wave)"/>
+    <rect x="756" y="486" width="176" height="52" rx="26" fill="url(#accent)"/>
+    <rect x="756" y="574" width="176" height="52" rx="26" fill="url(#wave)"/>
+</svg>

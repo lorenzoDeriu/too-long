@@ -20,6 +20,7 @@
 		C3CE26983B218BC41FCCD7BE /* TooLongTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FAF5239F7AAA463DA0C5FB /* TooLongTests.swift */; };
 		C7E4E3D38F450C84A822F7BB /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D66D0BEBAD02F94EDAB215 /* HistoryStore.swift */; };
 		DB4F19630F123993AD15642E /* TooLongApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403C8BFF3E23D4AF5D4E152D /* TooLongApp.swift */; };
+		EB710F449D5E7FF133E5702A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1D2139C50AD6216603902759 /* Assets.xcassets */; };
 		F04C30F1BF7A926D475B26C0 /* Brand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6ABDCB8A7BA118445F1A0D6 /* Brand.swift */; };
 /* End PBXBuildFile section */
 
@@ -36,6 +37,7 @@
 /* Begin PBXFileReference section */
 		19AE7C2BF565159F2BED96B7 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		1A1ED496BE52CE3C5C18E3B2 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
+		1D2139C50AD6216603902759 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		403C8BFF3E23D4AF5D4E152D /* TooLongApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooLongApp.swift; sourceTree = "<group>"; };
 		47E1FE7B19173F4973C68A38 /* VoiceNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNote.swift; sourceTree = "<group>"; };
 		7688ED52B39109B1B5484CFE /* TooLongTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TooLongTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -117,6 +119,7 @@
 		CD0ECFF8B6694DA9A8C630A4 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				1D2139C50AD6216603902759 /* Assets.xcassets */,
 				78836E1196FC4A92672E5A7B /* TooLong.entitlements */,
 			);
 			path = Resources;
@@ -149,6 +152,7 @@
 			buildConfigurationList = 3C448C92E7344274E17B3D7D /* Build configuration list for PBXNativeTarget "TooLong" */;
 			buildPhases = (
 				40320434CA1B1982BF9249A9 /* Sources */,
+				AD9F879E442A043B41C3336F /* Resources */,
 			);
 			buildRules = (
 			);
@@ -217,6 +221,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AD9F879E442A043B41C3336F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EB710F449D5E7FF133E5702A /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		25A8375A140E2E7354B746F8 /* Sources */ = {

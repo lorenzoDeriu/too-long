@@ -2,7 +2,13 @@ import SwiftUI
 
 struct ResultView: View {
     @Environment(AppModel.self) private var model
+    @State private var copiedTarget: CopyTarget?
     let note: VoiceNote
+
+    private enum CopyTarget {
+        case recap
+        case transcript
+    }
 
     var body: some View {
         ScrollView {
@@ -14,12 +20,12 @@ struct ResultView: View {
                         HStack(spacing: 9) {
                             ProgressView().controlSize(.small)
                             Text("Getting to the point…")
-                                .font(.system(.callout, design: .rounded, weight: .semibold))
+                                .font(.callout.weight(.semibold))
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                         .liquidPanel(
-                            tint: TooLongStyle.sunshine.opacity(0.16),
+                            tint: TooLongStyle.aqua.opacity(0.10),
                             cornerRadius: 15
                         )
                     }
@@ -35,7 +41,7 @@ struct ResultView: View {
                     Button {
                         model.startOver()
                     } label: {
-                        Label("Another one", systemImage: "plus")
+                        Label("Transcribe another note", systemImage: "plus")
                     }
                     .buttonStyle(SoftButtonStyle())
                     .frame(maxWidth: .infinity)
@@ -51,20 +57,20 @@ struct ResultView: View {
         HStack(alignment: .top, spacing: 10) {
             ZStack {
                 Image(systemName: "waveform")
-                    .foregroundStyle(TooLongStyle.tomato)
+                    .foregroundStyle(TooLongStyle.indigo)
             }
             .frame(width: 42, height: 42)
             .glassEffect(
-                .clear.tint(TooLongStyle.tomato.opacity(0.12)),
+                .clear.tint(TooLongStyle.indigo.opacity(0.12)),
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(note.fileName)
-                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .lineLimit(2)
                 Text(noteDetails)
-                    .font(.system(.caption, design: .rounded))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -84,66 +90,43 @@ struct ResultView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Label("In short", systemImage: "sparkles")
-                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .font(.headline.weight(.semibold))
                 Spacer()
                 Button {
                     model.copyRecap()
+                    markCopied(.recap)
                 } label: {
-                    Image(systemName: "doc.on.doc")
+                    Image(systemName: copiedTarget == .recap ? "checkmark" : "doc.on.doc")
+                        .foregroundStyle(copiedTarget == .recap ? TooLongStyle.success : Color.primary)
                 }
                 .buttonStyle(.glass)
-                .help("Copy recap")
+                .help(copiedTarget == .recap ? "Recap copied" : "Copy recap")
+                .accessibilityLabel(copiedTarget == .recap ? "Recap copied" : "Copy recap")
             }
 
             Text(recap.inShort)
-                .font(.system(.body, design: .rounded))
+                .font(.body)
                 .textSelection(.enabled)
 
             if !recap.worthReplyingTo.isEmpty {
                 Divider().opacity(0.55)
                 VStack(alignment: .leading, spacing: 7) {
                     Text("Worth replying to")
-                        .font(.system(.callout, design: .rounded, weight: .bold))
+                        .font(.callout.weight(.semibold))
                     ForEach(recap.worthReplyingTo, id: \.self) { item in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Circle()
-                                .fill(TooLongStyle.tomato)
+                                .fill(TooLongStyle.aqua)
                                 .frame(width: 6, height: 6)
                             Text(item)
-                                .font(.system(.callout, design: .rounded))
+                                .font(.callout)
                         }
                     }
                 }
             }
-
-            Divider().opacity(0.55)
-
-            if recap.hasSuggestedReply {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("A reply you could send")
-                            .font(.system(.callout, design: .rounded, weight: .bold))
-                        Spacer()
-                        Button("Copy") { model.copySuggestedReply() }
-                            .buttonStyle(.glass)
-                            .font(.caption)
-                    }
-                    Text(recap.suggestedReply)
-                        .font(.system(.callout, design: .rounded))
-                        .italic()
-                        .textSelection(.enabled)
-                }
-            } else {
-                Button {
-                    model.makeRecap(includeReplyDraft: true)
-                } label: {
-                    Label("Help me reply", systemImage: "arrowshape.turn.up.left")
-                }
-                .buttonStyle(SoftButtonStyle())
-            }
         }
         .padding(16)
-        .liquidPanel(tint: TooLongStyle.sunshine.opacity(0.22), cornerRadius: 22)
+        .liquidPanel(tint: TooLongStyle.indigo.opacity(0.12), cornerRadius: 22)
     }
 
     @ViewBuilder
@@ -151,9 +134,9 @@ struct ResultView: View {
         VStack(alignment: .leading, spacing: 10) {
             if model.settings.provider == .none {
                 Text("The transcript is ready.")
-                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .font(.headline.weight(.semibold))
                 Text("Want the short version too? Add an OpenAI or Anthropic key in Settings. It's completely optional.")
-                    .font(.system(.callout, design: .rounded))
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                 SettingsLink {
                     Text("Set up recaps")
@@ -161,7 +144,7 @@ struct ResultView: View {
                 .buttonStyle(SoftButtonStyle())
             } else {
                 Text("Want the short version?")
-                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .font(.headline.weight(.semibold))
                 Button {
                     model.makeRecap()
                 } label: {
@@ -173,7 +156,7 @@ struct ResultView: View {
             if let message = model.recapMessage {
                 Text(message)
                     .font(.caption)
-                    .foregroundStyle(TooLongStyle.tomato)
+                    .foregroundStyle(TooLongStyle.danger)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -185,20 +168,34 @@ struct ResultView: View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
                 Text("What they said")
-                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .font(.headline.weight(.semibold))
                 Spacer()
-                Button("Copy") { model.copyTranscript() }
+                Button(copiedTarget == .transcript ? "Copied" : "Copy") {
+                    model.copyTranscript()
+                    markCopied(.transcript)
+                }
                     .buttonStyle(.glass)
                     .font(.caption)
+                    .foregroundStyle(copiedTarget == .transcript ? TooLongStyle.success : Color.primary)
             }
 
             Text(note.transcript)
-                .font(.system(.callout, design: .rounded))
+                .font(.callout)
                 .foregroundStyle(.primary.opacity(0.84))
                 .lineSpacing(3)
                 .textSelection(.enabled)
         }
         .padding(16)
         .liquidPanel(tint: TooLongStyle.surface.opacity(0.08), cornerRadius: 20)
+    }
+
+    private func markCopied(_ target: CopyTarget) {
+        copiedTarget = target
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.4))
+            if copiedTarget == target {
+                copiedTarget = nil
+            }
+        }
     }
 }

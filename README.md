@@ -48,7 +48,7 @@ The macOS 26 requirement comes from the Apple speech and Liquid Glass APIs used 
 - Drag and drop or file picker for audio and video files
 - Direct support for WhatsApp `.opus` voice notes
 - Timestamped transcripts that can be copied in one click
-- Optional **In short** recap, things **Worth replying to**, and a suggested reply
+- Optional **In short** recap and things **Worth replying to**
 - Bring-your-own-key support for OpenAI and Anthropic
 - API keys stored locally in macOS Keychain
 - On-device history for the 20 most recent notes
@@ -96,9 +96,8 @@ Recaps are designed for normal conversation rather than meeting minutes. They ca
 
 - A short summary in the same language as the transcript
 - Questions or details worth replying to
-- An optional natural reply draft
 
-You can disable automatic recaps, reply points, or reply drafts independently.
+You can disable automatic recaps or reply points independently.
 
 ## Tests
 

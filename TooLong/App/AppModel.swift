@@ -57,6 +57,12 @@ final class AppModel {
 
     func process(fileURL: URL) {
         currentJob?.cancel()
+        phase = settings.language == .automatic ? .detectingLanguage : .transcribing
+        progress = 0
+        currentNote = nil
+        errorMessage = nil
+        recapMessage = nil
+
         currentJob = Task { [weak self] in
             await self?.runTranscription(fileURL: fileURL)
         }
@@ -69,11 +75,11 @@ final class AppModel {
         progress = 0
     }
 
-    func makeRecap(includeReplyDraft: Bool? = nil) {
+    func makeRecap() {
         guard currentNote != nil else { return }
         currentJob?.cancel()
         currentJob = Task { [weak self] in
-            await self?.runRecap(includeReplyDraft: includeReplyDraft)
+            await self?.runRecap()
         }
     }
 
@@ -105,15 +111,7 @@ final class AppModel {
         if !recap.worthReplyingTo.isEmpty {
             parts.append("Worth replying to:\n" + recap.worthReplyingTo.map { "• \($0)" }.joined(separator: "\n"))
         }
-        if recap.hasSuggestedReply {
-            parts.append("Suggested reply:\n\(recap.suggestedReply)")
-        }
         copyToPasteboard(parts.joined(separator: "\n\n"))
-    }
-
-    func copySuggestedReply() {
-        guard let reply = currentNote?.recap?.suggestedReply else { return }
-        copyToPasteboard(reply)
     }
 
     func storedAPIKey(for provider: AIProvider) -> String {
@@ -133,12 +131,6 @@ final class AppModel {
     }
 
     private func runTranscription(fileURL: URL) async {
-        phase = settings.language == .automatic ? .detectingLanguage : .transcribing
-        progress = 0
-        currentNote = nil
-        errorMessage = nil
-        recapMessage = nil
-
         do {
             let result = try await transcriber.transcribe(
                 fileURL: fileURL,
@@ -166,7 +158,7 @@ final class AppModel {
             if settings.automaticRecaps,
                settings.provider != .none,
                !storedAPIKey(for: settings.provider).isEmpty {
-                await runRecap(includeReplyDraft: nil)
+                await runRecap()
             } else {
                 phase = .ready
                 await persistHistory()
@@ -179,7 +171,7 @@ final class AppModel {
         }
     }
 
-    private func runRecap(includeReplyDraft: Bool?) async {
+    private func runRecap() async {
         guard var note = currentNote else { return }
         let provider = settings.provider
         phase = .recapping
@@ -193,8 +185,7 @@ final class AppModel {
                 provider: provider,
                 apiKey: apiKey,
                 model: settings.selectedModel,
-                includeReplyPoints: settings.includeReplyPoints,
-                includeReplyDraft: includeReplyDraft ?? settings.includeReplyDraft
+                includeReplyPoints: settings.includeReplyPoints
             )
             try Task.checkCancellation()
 

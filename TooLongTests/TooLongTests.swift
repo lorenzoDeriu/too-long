@@ -15,9 +15,19 @@ final class VoiceNoteTests: XCTestCase {
         XCTAssertEqual(segment.timestamp, "01:05")
     }
 
-    func testRecapKnowsWhenReplyIsPresent() {
-        XCTAssertFalse(VoiceRecap(inShort: "Hi", worthReplyingTo: [], suggestedReply: "  ").hasSuggestedReply)
-        XCTAssertTrue(VoiceRecap(inShort: "Hi", worthReplyingTo: [], suggestedReply: "Sounds good!").hasSuggestedReply)
+    func testRecapIgnoresLegacySuggestedReplyWhenDecoding() throws {
+        let legacy = Data(
+            #"{"inShort":"Dinner moved to eight.","worthReplyingTo":["Can you make it?"],"suggestedReply":"Yep, see you then!"}"#.utf8
+        )
+
+        let recap = try JSONDecoder().decode(VoiceRecap.self, from: legacy)
+        XCTAssertEqual(recap.inShort, "Dinner moved to eight.")
+        XCTAssertEqual(recap.worthReplyingTo, ["Can you make it?"])
+
+        let encoded = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(recap)) as? [String: Any]
+        )
+        XCTAssertNil(encoded["suggestedReply"])
     }
 }
 
@@ -27,12 +37,13 @@ final class AppSettingsTests: XCTestCase {
         let suiteName = "TooLongTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "includeReplyDraft")
 
         let settings = AppSettings(defaults: defaults)
         XCTAssertEqual(settings.provider, .none)
         XCTAssertTrue(settings.automaticRecaps)
         XCTAssertTrue(settings.includeReplyPoints)
-        XCTAssertFalse(settings.includeReplyDraft)
+        XCTAssertNil(defaults.object(forKey: "includeReplyDraft"))
         XCTAssertEqual(settings.language, .automatic)
 
         settings.provider = .anthropic
@@ -110,10 +121,19 @@ final class AIRecapServiceTests: XCTestCase {
             XCTAssertEqual(format["name"] as? String, "voice_note_recap")
             XCTAssertEqual(format["strict"] as? Bool, true)
             XCTAssertEqual(json["store"] as? Bool, false)
+            let schema = try XCTUnwrap(format["schema"] as? [String: Any])
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertNil(properties["suggestedReply"])
+            XCTAssertEqual(
+                Set(try XCTUnwrap(schema["required"] as? [String])),
+                Set(["inShort", "worthReplyingTo"])
+            )
+            let instructions = try XCTUnwrap(json["instructions"] as? String)
+            XCTAssertTrue(instructions.contains("Do not draft, suggest, or imply a reply"))
 
             return MockURLProtocol.response(
                 for: request,
-                json: #"{"output":[{"content":[{"type":"output_text","text":"{\"inShort\":\"Dinner moved to eight.\",\"worthReplyingTo\":[\"Can you make it?\"],\"suggestedReply\":\"Yep, see you then!\"}"}]}]}"#
+                json: #"{"output":[{"content":[{"type":"output_text","text":"{\"inShort\":\"Dinner moved to eight.\",\"worthReplyingTo\":[\"Can you make it?\"]}"}]}]}"#
             )
         }
 
@@ -123,13 +143,11 @@ final class AIRecapServiceTests: XCTestCase {
             provider: .openAI,
             apiKey: "test-key",
             model: "gpt-test",
-            includeReplyPoints: true,
-            includeReplyDraft: true
+            includeReplyPoints: true
         )
 
         XCTAssertEqual(recap.inShort, "Dinner moved to eight.")
         XCTAssertEqual(recap.worthReplyingTo, ["Can you make it?"])
-        XCTAssertEqual(recap.suggestedReply, "Yep, see you then!")
     }
 
     func testAnthropicUsesProviderSpecificStructuredOutputAndDecodesRecap() async throws {
@@ -143,11 +161,15 @@ final class AIRecapServiceTests: XCTestCase {
             let format = try XCTUnwrap(outputConfig["format"] as? [String: Any])
             XCTAssertNil(format["name"])
             XCTAssertNil(format["strict"])
-            XCTAssertNotNil(format["schema"])
+            let schema = try XCTUnwrap(format["schema"] as? [String: Any])
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertNil(properties["suggestedReply"])
+            let instructions = try XCTUnwrap(json["system"] as? String)
+            XCTAssertTrue(instructions.contains("Do not draft, suggest, or imply a reply"))
 
             return MockURLProtocol.response(
                 for: request,
-                json: #"{"content":[{"type":"text","text":"{\"inShort\":\"Dinner moved to eight.\",\"worthReplyingTo\":[],\"suggestedReply\":\"\"}"}]}"#
+                json: #"{"content":[{"type":"text","text":"{\"inShort\":\"Dinner moved to eight.\",\"worthReplyingTo\":[]}"}]}"#
             )
         }
 
@@ -157,13 +179,11 @@ final class AIRecapServiceTests: XCTestCase {
             provider: .anthropic,
             apiKey: "test-key",
             model: "claude-test",
-            includeReplyPoints: false,
-            includeReplyDraft: false
+            includeReplyPoints: false
         )
 
         XCTAssertEqual(recap.inShort, "Dinner moved to eight.")
         XCTAssertTrue(recap.worthReplyingTo.isEmpty)
-        XCTAssertFalse(recap.hasSuggestedReply)
     }
 
     private func mockSession() -> URLSession {
