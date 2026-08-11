@@ -110,6 +110,9 @@ final class AIRecapServiceTests: XCTestCase {
             XCTAssertEqual(format["name"] as? String, "voice_note_recap")
             XCTAssertEqual(format["strict"] as? Bool, true)
             XCTAssertEqual(json["store"] as? Bool, false)
+            let instructions = try XCTUnwrap(json["instructions"] as? String)
+            XCTAssertTrue(instructions.contains("three to five natural sentences"))
+            XCTAssertTrue(instructions.contains("useful context around it"))
 
             return MockURLProtocol.response(
                 for: request,
@@ -144,6 +147,9 @@ final class AIRecapServiceTests: XCTestCase {
             XCTAssertNil(format["name"])
             XCTAssertNil(format["strict"])
             XCTAssertNotNil(format["schema"])
+            let instructions = try XCTUnwrap(json["system"] as? String)
+            XCTAssertTrue(instructions.contains("three to five natural sentences"))
+            XCTAssertTrue(instructions.contains("useful context around it"))
 
             return MockURLProtocol.response(
                 for: request,

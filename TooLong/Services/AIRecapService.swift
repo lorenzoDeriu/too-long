@@ -168,7 +168,7 @@ actor AIRecapService {
                 "properties": [
                     "inShort": [
                         "type": "string",
-                        "description": "A warm, concise recap of the voice note in its original language.",
+                        "description": "A warm recap with the main point and useful concrete details, in the voice note's original language.",
                     ],
                     "worthReplyingTo": [
                         "type": "array",
@@ -192,7 +192,7 @@ actor AIRecapService {
         Stay faithful to the transcript. Do not invent facts, questions, plans, or emotions.
         Write in the same language as the transcript.
 
-        inShort: two to four short sentences capturing what the person actually wanted to say.
+        inShort: three to five natural sentences capturing what the person actually wanted to say and the useful context around it. Include relevant specifics such as people, timing, places, reasons, or plans when they help the recipient understand the message, without turning the recap into a transcript.
         worthReplyingTo: \(includeReplyPoints ? "up to four genuine questions, plans, or details worth answering" : "always return an empty array").
         suggestedReply: \(includeReplyDraft ? "a brief, natural reply that the recipient could edit and send" : "always return an empty string").
         """
