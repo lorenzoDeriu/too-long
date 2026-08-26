@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct MenuBarContentView: View {
     @Environment(AppModel.self) private var model
+    @State private var showSettings = false
 
     var body: some View {
         ZStack {
@@ -14,7 +15,10 @@ struct MenuBarContentView: View {
                     header
 
                     Group {
-                        if let note = model.currentNote {
+                        if showSettings {
+                            SettingsView()
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                        } else if let note = model.currentNote {
                             ResultView(note: note)
                         } else {
                             switch model.phase {
@@ -31,6 +35,7 @@ struct MenuBarContentView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
 
                     footer
                 }
@@ -54,45 +59,72 @@ struct MenuBarContentView: View {
         model.process(fileURL: url)
     }
 
+    private func openSettings() {
+        withAnimation(.easeInOut(duration: 0.2)) { showSettings = true }
+    }
+
+    private func closeSettings() {
+        withAnimation(.easeInOut(duration: 0.2)) { showSettings = false }
+    }
+
     private var header: some View {
         HStack(spacing: 11) {
-            TinyWaveform(active: model.phase.isWorking)
+            if showSettings {
+                Button(action: closeSettings) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .buttonStyle(.glass)
+                .help("Back")
 
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Too Long")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                Text("for voice notes that got away")
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Settings")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                    Text("Set up your way")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                TinyWaveform(active: model.phase.isWorking)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Too Long")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                    Text("for voice notes that got away")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
 
-            if !model.recentNotes.isEmpty {
-                Menu {
-                    ForEach(model.recentNotes.prefix(8)) { note in
-                        Button {
-                            model.select(note)
-                        } label: {
-                            Text(note.fileName)
-                            Text(note.createdAt, style: .relative)
+            if !showSettings {
+                if !model.recentNotes.isEmpty {
+                    Menu {
+                        ForEach(model.recentNotes.prefix(8)) { note in
+                            Button {
+                                model.select(note)
+                            } label: {
+                                Text(note.fileName)
+                                Text(note.createdAt, style: .relative)
+                            }
                         }
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 15, weight: .semibold))
                     }
-                } label: {
-                    Image(systemName: "clock.arrow.circlepath")
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Recent voice notes")
+                }
+
+                Button(action: openSettings) {
+                    Image(systemName: "gearshape.fill")
                         .font(.system(size: 15, weight: .semibold))
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .help("Recent voice notes")
+                .buttonStyle(.glass)
+                .help("Settings")
             }
-
-            SettingsLink {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 15, weight: .semibold))
-            }
-            .buttonStyle(.glass)
-            .help("Settings")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

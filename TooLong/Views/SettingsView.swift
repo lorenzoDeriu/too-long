@@ -15,110 +15,88 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var settings = model.settings
 
-        ZStack {
-            LiquidBackdrop()
+        ScrollView {
+            GlassEffectContainer(spacing: 20) {
+                VStack(alignment: .leading, spacing: 22) {
+                    settingsSection("Listening", icon: "waveform") {
+                        Picker("Voice note language", selection: $settings.language) {
+                            ForEach(TranscriptionLanguage.allCases) { language in
+                                Text(language.displayName).tag(language)
+                            }
+                        }
+                        Text(settings.language == .automatic
+                             ? "Too Long compares a short sample using speech languages already installed on this Mac."
+                             : "Transcription happens on this Mac using Apple's speech model.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
-            ScrollView {
-                GlassEffectContainer(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 22) {
-                        HStack(spacing: 14) {
-                            TinyWaveform()
-                                .padding(12)
-                                .glassEffect(
-                                    .clear.tint(TooLongStyle.tomato.opacity(0.12)),
-                                    in: Circle()
-                                )
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Too Long")
-                                    .font(.system(size: 28, weight: .black, design: .rounded))
-                                Text("Your voice-note shortcut, set up your way.")
-                                    .font(.system(.body, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                    settingsSection("In short", icon: "sparkles") {
+                        Picker("Recap provider", selection: $settings.provider) {
+                            ForEach(AIProvider.allCases) { provider in
+                                Text(provider.displayName).tag(provider)
                             }
                         }
 
-                        settingsSection("Listening", icon: "waveform") {
-                            Picker("Voice note language", selection: $settings.language) {
-                                ForEach(TranscriptionLanguage.allCases) { language in
-                                    Text(language.displayName).tag(language)
+                        if settings.provider == .none {
+                            Label("Recaps are off. Voice notes are still transcribed locally.", systemImage: "checkmark.shield.fill")
+                                .font(.system(.callout, design: .rounded))
+                                .foregroundStyle(TooLongStyle.leaf)
+                        } else {
+                            VStack(alignment: .leading, spacing: 9) {
+                                SecureField("\(settings.provider.displayName) API key", text: $apiKey)
+                                    .textFieldStyle(.roundedBorder)
+
+                                HStack {
+                                    Button("Save key") { saveKey() }
+                                        .buttonStyle(PrimaryButtonStyle())
+
+                                    Button(keyStatus == .testing ? "Checking…" : "Check key") {
+                                        checkKey()
+                                    }
+                                    .buttonStyle(SoftButtonStyle())
+                                    .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || keyStatus == .testing)
+
+                                    Spacer()
+
+                                    if !apiKey.isEmpty {
+                                        Button("Remove", role: .destructive) { removeKey() }
+                                            .buttonStyle(.plain)
+                                    }
                                 }
+
+                                statusView
                             }
-                            Text(settings.language == .automatic
-                                 ? "Too Long compares a short sample using speech languages already installed on this Mac."
-                                 : "Transcription happens on this Mac using Apple's speech model.")
+
+                            Divider()
+
+                            Toggle("Make an In short automatically", isOn: $settings.automaticRecaps)
+                            Text("When this is on and a key is saved, the recap starts after every transcription. Turn it off whenever you want everything to stay local.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
 
-                        settingsSection("In short", icon: "sparkles") {
-                            Picker("Recap provider", selection: $settings.provider) {
-                                ForEach(AIProvider.allCases) { provider in
-                                    Text(provider.displayName).tag(provider)
+                            Toggle("Show things worth replying to", isOn: $settings.includeReplyPoints)
+                            Toggle("Draft a reply automatically", isOn: $settings.includeReplyDraft)
+
+                            DisclosureGroup("Model") {
+                                if settings.provider == .openAI {
+                                    TextField("OpenAI model", text: $settings.openAIModel)
+                                } else {
+                                    TextField("Anthropic model", text: $settings.anthropicModel)
                                 }
                             }
-
-                            if settings.provider == .none {
-                                Label("Recaps are off. Voice notes are still transcribed locally.", systemImage: "checkmark.shield.fill")
-                                    .font(.system(.callout, design: .rounded))
-                                    .foregroundStyle(TooLongStyle.leaf)
-                            } else {
-                                VStack(alignment: .leading, spacing: 9) {
-                                    SecureField("\(settings.provider.displayName) API key", text: $apiKey)
-                                        .textFieldStyle(.roundedBorder)
-
-                                    HStack {
-                                        Button("Save key") { saveKey() }
-                                            .buttonStyle(PrimaryButtonStyle())
-
-                                        Button(keyStatus == .testing ? "Checking…" : "Check key") {
-                                            checkKey()
-                                        }
-                                        .buttonStyle(SoftButtonStyle())
-                                        .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || keyStatus == .testing)
-
-                                        Spacer()
-
-                                        if !apiKey.isEmpty {
-                                            Button("Remove", role: .destructive) { removeKey() }
-                                                .buttonStyle(.plain)
-                                        }
-                                    }
-
-                                    statusView
-                                }
-
-                                Divider()
-
-                                Toggle("Make an In short automatically", isOn: $settings.automaticRecaps)
-                                Text("When this is on and a key is saved, the recap starts after every transcription. Turn it off whenever you want everything to stay local.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-
-                                Toggle("Show things worth replying to", isOn: $settings.includeReplyPoints)
-                                Toggle("Draft a reply automatically", isOn: $settings.includeReplyDraft)
-
-                                DisclosureGroup("Model") {
-                                    if settings.provider == .openAI {
-                                        TextField("OpenAI model", text: $settings.openAIModel)
-                                    } else {
-                                        TextField("Anthropic model", text: $settings.anthropicModel)
-                                    }
-                                }
-                            }
-                        }
-
-                        settingsSection("Privacy, plainly", icon: "hand.raised.fill") {
-                            privacyRow("Your audio", detail: "Stays on this Mac")
-                            privacyRow("Your transcript", detail: settings.provider == .none ? "Stays on this Mac" : "Sent only when making a recap")
-                            privacyRow("Your API key", detail: "Saved in macOS Keychain")
                         }
                     }
-                    .padding(28)
+
+                    settingsSection("Privacy, plainly", icon: "hand.raised.fill") {
+                        privacyRow("Your audio", detail: "Stays on this Mac")
+                        privacyRow("Your transcript", detail: settings.provider == .none ? "Stays on this Mac" : "Sent only when making a recap")
+                        privacyRow("Your API key", detail: "Saved in macOS Keychain")
+                    }
                 }
+                .padding(20)
             }
         }
-        .frame(width: 540, height: 650)
         .onAppear { loadKey() }
         .onChange(of: settings.provider) { _, _ in loadKey() }
     }
