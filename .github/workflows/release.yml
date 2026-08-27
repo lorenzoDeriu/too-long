@@ -1,0 +1,87 @@
+name: Release
+
+# Runs when a version tag (e.g. v1.2.3) is pushed. Builds the app, packages
+# it as a .dmg, and publishes it on GitHub Releases so it can be installed
+# via Homebrew (see homebrew/README.md) or downloaded directly.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-26
+    env:
+      APP_NAME: "Too Long"
+      SCHEME: "TooLong"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (Release, ad-hoc/unsigned)
+        run: |
+          xcodebuild \
+            -project TooLong.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -derivedDataPath build \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Ad-hoc sign app bundle
+        run: |
+          APP_PATH="build/Build/Products/Release/${APP_NAME}.app"
+          codesign --force --deep --sign - "$APP_PATH"
+          codesign --verify --verbose "$APP_PATH"
+
+      - name: Create .dmg
+        id: dmg
+        run: |
+          APP_PATH="build/Build/Products/Release/${APP_NAME}.app"
+          DMG_NAME="Too-Long-${{ steps.version.outputs.version }}.dmg"
+          STAGING_DIR="$(mktemp -d)/dmg-staging"
+          mkdir -p "$STAGING_DIR"
+          cp -R "$APP_PATH" "$STAGING_DIR/"
+          ln -s /Applications "$STAGING_DIR/Applications"
+          hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_NAME"
+          echo "dmg_path=${DMG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(shasum -a 256 "$DMG_NAME" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Too Long ${{ steps.version.outputs.version }}"
+          files: ${{ steps.dmg.outputs.dmg_path }}
+          body: |
+            Automated release of Too Long ${{ steps.version.outputs.version }}.
+
+            The app is signed ad-hoc (no Apple Developer ID). On first launch,
+            right-click the app and choose **Open** to bypass Gatekeeper, or run:
+            `xattr -cr "/Applications/Too Long.app"`
+
+            **SHA-256** (for the Homebrew cask, see `homebrew/too-long.rb`):
+            `${{ steps.dmg.outputs.sha256 }}`
