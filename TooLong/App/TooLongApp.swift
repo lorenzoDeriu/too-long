@@ -12,10 +12,5 @@ struct TooLongApp: App {
             Label("Too Long", systemImage: appDelegate.model.phase.isWorking ? "waveform" : "text.bubble.fill")
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView()
-                .environment(appDelegate.model)
-        }
     }
 }
