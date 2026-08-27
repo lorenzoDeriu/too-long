@@ -13,6 +13,7 @@ final class AppSettings {
         static let languageSelectionVersion = "transcriptionLanguageSelectionVersion"
         static let openAIModel = "openAIModel"
         static let anthropicModel = "anthropicModel"
+        static let forceDarkMode = "forceDarkMode"
     }
 
     private let defaults: UserDefaults
@@ -45,6 +46,12 @@ final class AppSettings {
         didSet { defaults.set(anthropicModel, forKey: Key.anthropicModel) }
     }
 
+    /// When on, keeps Too Long dark regardless of the system appearance.
+    /// Off (the default) follows macOS.
+    var forceDarkMode: Bool {
+        didSet { defaults.set(forceDarkMode, forKey: Key.forceDarkMode) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         provider = AIProvider(rawValue: defaults.string(forKey: Key.provider) ?? "") ?? .none
@@ -60,6 +67,7 @@ final class AppSettings {
         }
         openAIModel = defaults.string(forKey: Key.openAIModel) ?? AIProvider.openAI.defaultModel
         anthropicModel = defaults.string(forKey: Key.anthropicModel) ?? AIProvider.anthropic.defaultModel
+        forceDarkMode = defaults.object(forKey: Key.forceDarkMode) as? Bool ?? false
     }
 
     var selectedModel: String {
