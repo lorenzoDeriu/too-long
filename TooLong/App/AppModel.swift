@@ -31,6 +31,7 @@ final class AppModel {
     @ObservationIgnored private let recapService: AIRecapService
     @ObservationIgnored private let historyStore: HistoryStore
     @ObservationIgnored private let keychain: KeychainStore
+    @ObservationIgnored private let autoImportService: AutoImportService
     @ObservationIgnored private var currentJob: Task<Void, Never>?
 
     init(
@@ -38,21 +39,66 @@ final class AppModel {
         transcriber: LocalTranscriptionService = LocalTranscriptionService(),
         recapService: AIRecapService = AIRecapService(),
         historyStore: HistoryStore = HistoryStore(),
-        keychain: KeychainStore = KeychainStore()
+        keychain: KeychainStore = KeychainStore(),
+        autoImportService: AutoImportService = AutoImportService()
     ) {
         self.settings = settings
         self.transcriber = transcriber
         self.recapService = recapService
         self.historyStore = historyStore
         self.keychain = keychain
+        self.autoImportService = autoImportService
+        autoImportService.onNewFile = { [weak self] url in
+            self?.process(fileURL: url)
+        }
 
         Task { [weak self] in
             await self?.loadHistory()
+        }
+
+        if settings.autoImportEnabled, let bookmark = settings.autoImportFolderBookmark {
+            resumeAutoImport(bookmark: bookmark)
         }
     }
 
     deinit {
         currentJob?.cancel()
+    }
+
+    /// Presents a folder picker and, if the user chooses one, turns auto-import on for it.
+    /// Leaves auto-import off if the user cancels or the folder can't be watched.
+    func enableAutoImport() {
+        guard let (url, bookmark) = autoImportService.pickFolder() else { return }
+
+        settings.autoImportFolderBookmark = bookmark
+        settings.autoImportFolderName = url.lastPathComponent
+
+        let started = autoImportService.startWatching(bookmark: bookmark) { [weak settings] refreshed in
+            settings?.autoImportFolderBookmark = refreshed
+        }
+        settings.autoImportEnabled = started
+        if !started {
+            settings.autoImportFolderBookmark = nil
+            settings.autoImportFolderName = nil
+        }
+    }
+
+    func disableAutoImport() {
+        autoImportService.stopWatching()
+        settings.autoImportEnabled = false
+        settings.autoImportFolderBookmark = nil
+        settings.autoImportFolderName = nil
+    }
+
+    private func resumeAutoImport(bookmark: Data) {
+        let started = autoImportService.startWatching(bookmark: bookmark) { [weak settings] refreshed in
+            settings?.autoImportFolderBookmark = refreshed
+        }
+        if !started {
+            settings.autoImportEnabled = false
+            settings.autoImportFolderBookmark = nil
+            settings.autoImportFolderName = nil
+        }
     }
 
     func process(fileURL: URL) {

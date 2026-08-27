@@ -44,6 +44,26 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(restored.automaticRecaps)
         XCTAssertEqual(restored.language, .italian)
     }
+
+    func testAutoImportIsOffByDefaultAndHasNoFolderUntilChosen() {
+        let suiteName = "TooLongTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertFalse(settings.autoImportEnabled)
+        XCTAssertNil(settings.autoImportFolderName)
+        XCTAssertNil(settings.autoImportFolderBookmark)
+
+        settings.autoImportEnabled = true
+        settings.autoImportFolderName = "Downloads"
+        settings.autoImportFolderBookmark = Data([0x01, 0x02])
+
+        let restored = AppSettings(defaults: defaults)
+        XCTAssertTrue(restored.autoImportEnabled)
+        XCTAssertEqual(restored.autoImportFolderName, "Downloads")
+        XCTAssertEqual(restored.autoImportFolderBookmark, Data([0x01, 0x02]))
+    }
 }
 
 final class HistoryStoreTests: XCTestCase {
@@ -69,6 +89,23 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(restored.last?.fileName, "note-19.opus")
 
         try? FileManager.default.removeItem(at: root)
+    }
+}
+
+final class AutoImportServiceTests: XCTestCase {
+    func testAudioFileNamesFiltersToSupportedExtensionsOnly() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "TooLongTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let names = ["note.opus", "note.OGG", "note.m4a", "note.txt", "note.pdf", ".hidden.opus"]
+        for name in names {
+            FileManager.default.createFile(atPath: root.appending(path: name).path, contents: Data())
+        }
+
+        let found = AutoImportService.audioFileNames(in: root)
+        XCTAssertEqual(found, ["note.opus", "note.OGG", "note.m4a"])
     }
 }
 

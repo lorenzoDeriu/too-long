@@ -25,6 +25,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.lorenzoderiu.toolong
         PRODUCT_NAME: "Too Long"
         GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_FILE: TooLong/Resources/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: "Too Long"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         INFOPLIST_KEY_LSUIElement: true
