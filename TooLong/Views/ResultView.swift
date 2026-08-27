@@ -3,6 +3,7 @@ import SwiftUI
 struct ResultView: View {
     @Environment(AppModel.self) private var model
     let note: VoiceNote
+    let openSettings: () -> Void
 
     var body: some View {
         ScrollView {
@@ -155,9 +156,7 @@ struct ResultView: View {
                 Text("Want the short version too? Add an OpenAI or Anthropic key in Settings. It's completely optional.")
                     .font(.system(.callout, design: .rounded))
                     .foregroundStyle(.secondary)
-                SettingsLink {
-                    Text("Set up recaps")
-                }
+                Button("Set up recaps", action: openSettings)
                 .buttonStyle(SoftButtonStyle())
             } else {
                 Text("Want the short version?")

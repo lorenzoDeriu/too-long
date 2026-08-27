@@ -19,7 +19,7 @@ struct MenuBarContentView: View {
                             SettingsView()
                                 .transition(.move(edge: .trailing).combined(with: .opacity))
                         } else if let note = model.currentNote {
-                            ResultView(note: note)
+                            ResultView(note: note, openSettings: openSettings)
                         } else {
                             switch model.phase {
                             case .detectingLanguage, .transcribing, .recapping:
