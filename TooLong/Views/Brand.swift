@@ -125,20 +125,30 @@ struct AppLogoImage: View {
 
 /// The small rounded-square accent-tinted icon used to anchor the empty,
 /// processing, failure, and result-header states.
+///
+/// Set `glass: false` when the badge already sits inside a `liquidPanel` —
+/// stacking a second `.glassEffect` region on top of another one reads as
+/// flat/opaque rather than liquid, and is the nested-glass composition the
+/// redesign is meant to avoid. Leave it `true` for badges placed directly on
+/// the backdrop, which need their own surface.
 struct IconBadge: View {
     var systemImage: String
     var size: CGFloat = 60
     var cornerRadius: CGFloat = 20
+    var glass: Bool = true
 
     var body: some View {
-        Image(systemName: systemImage)
+        let icon = Image(systemName: systemImage)
             .font(.system(size: size * 0.44, weight: .medium))
             .foregroundStyle(TooLongPalette.accent)
             .frame(width: size, height: size)
-            .glassEffect(
-                .clear.tint(TooLongPalette.accent.opacity(0.16)),
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            )
+
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if glass {
+            icon.glassEffect(.clear.tint(TooLongPalette.accent.opacity(0.16)), in: shape)
+        } else {
+            icon.background(TooLongPalette.accent.opacity(0.16), in: shape)
+        }
     }
 }
 

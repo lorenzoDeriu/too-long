@@ -174,7 +174,7 @@ private struct EmptyStateView: View {
             Spacer()
 
             VStack(spacing: 17) {
-                IconBadge(systemImage: "waveform.badge.plus", size: 64, cornerRadius: 20)
+                IconBadge(systemImage: "waveform.badge.plus", size: 64, cornerRadius: 20, glass: false)
 
                 VStack(spacing: 7) {
                     Text("Drop the long version.")
@@ -238,7 +238,7 @@ private struct ProcessingView: View {
         let t = TooLongPalette.tokens(for: colorScheme)
         VStack(spacing: 22) {
             Spacer()
-            IconBadge(systemImage: "waveform", size: 60, cornerRadius: 20)
+            IconBadge(systemImage: "waveform", size: 60, cornerRadius: 20, glass: false)
 
             VStack(spacing: 6) {
                 Text(processingTitle)
@@ -308,7 +308,7 @@ private struct FailureView: View {
         let t = TooLongPalette.tokens(for: colorScheme)
         VStack(spacing: 18) {
             Spacer()
-            IconBadge(systemImage: "waveform.slash", size: 60, cornerRadius: 20)
+            IconBadge(systemImage: "waveform.slash", size: 60, cornerRadius: 20, glass: false)
             Text("That one didn't land.")
                 .font(TooLongFont.heading(20))
                 .foregroundStyle(t.ink)
