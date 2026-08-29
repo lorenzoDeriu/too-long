@@ -13,6 +13,19 @@ final class AutoImportService {
     private var knownFileNames: Set<String> = []
     private var pendingScan: DispatchWorkItem?
 
+    /// Files seen for the first time but not yet confirmed stable, keyed by name, with the
+    /// size/modification-date snapshot taken the last time they were checked.
+    private var pendingFiles: [String: FileSnapshot] = [:]
+    /// Keeps re-checking `pendingFiles` for stability even when no further directory-write
+    /// events arrive (a file being copied or downloaded into the folder only triggers a
+    /// directory event when its entry first appears, not while its contents keep growing).
+    private var stabilityRecheck: DispatchWorkItem?
+
+    private struct FileSnapshot: Equatable {
+        let size: Int
+        let modificationDate: Date?
+    }
+
     /// Lets the user pick a folder and returns a security-scoped bookmark for it, or `nil`
     /// if they cancelled. The bookmark is what makes the choice survive app relaunches.
     func pickFolder() -> (url: URL, bookmark: Data)? {
@@ -90,6 +103,9 @@ final class AutoImportService {
     func stopWatching() {
         pendingScan?.cancel()
         pendingScan = nil
+        stabilityRecheck?.cancel()
+        stabilityRecheck = nil
+        pendingFiles = [:]
         source?.cancel()
         source = nil
         accessedURL?.stopAccessingSecurityScopedResource()
@@ -106,16 +122,63 @@ final class AutoImportService {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: workItem)
     }
 
+    /// Looks for files that are new since the last scan, and reports the ones that have
+    /// stopped changing. A file is only reported once its size and modification date match
+    /// what they were on the previous check, so a copy or download still in progress is
+    /// retried on the next check instead of being imported (and marked as handled) mid-write.
     private func scanForNewFiles() {
         guard let accessedURL else { return }
         let currentNames = Self.audioFileNames(in: accessedURL)
-        let newNames = currentNames.subtracting(knownFileNames)
-        knownFileNames = currentNames
-        guard !newNames.isEmpty else { return }
 
-        for name in newNames.sorted() {
+        // Stop tracking anything that disappeared (renamed away, deleted) before stabilizing.
+        pendingFiles = pendingFiles.filter { currentNames.contains($0.key) }
+
+        var stabilized: [String] = []
+        for (name, previousSnapshot) in pendingFiles {
+            guard let currentSnapshot = Self.snapshot(of: name, in: accessedURL) else {
+                pendingFiles.removeValue(forKey: name)
+                continue
+            }
+            if currentSnapshot == previousSnapshot {
+                stabilized.append(name)
+                pendingFiles.removeValue(forKey: name)
+            } else {
+                pendingFiles[name] = currentSnapshot
+            }
+        }
+
+        // Start tracking anything neither handled nor already pending. Take a baseline
+        // snapshot only — it needs to survive unchanged into a later check to count as stable.
+        let untracked = currentNames.subtracting(knownFileNames).subtracting(pendingFiles.keys)
+        for name in untracked {
+            pendingFiles[name] = Self.snapshot(of: name, in: accessedURL)
+        }
+
+        for name in stabilized.sorted() {
+            knownFileNames.insert(name)
             onNewFile?(accessedURL.appending(path: name))
         }
+
+        scheduleStabilityRecheckIfNeeded()
+    }
+
+    /// Keeps polling while files are still stabilizing, since a file that's only growing in
+    /// place won't produce any more directory-write events to trigger `scheduleScan` again.
+    private func scheduleStabilityRecheckIfNeeded() {
+        stabilityRecheck?.cancel()
+        stabilityRecheck = nil
+        guard !pendingFiles.isEmpty else { return }
+        let workItem = DispatchWorkItem { [weak self] in self?.scanForNewFiles() }
+        stabilityRecheck = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: workItem)
+    }
+
+    private static func snapshot(of name: String, in directory: URL) -> FileSnapshot? {
+        let values = try? directory.appending(path: name).resourceValues(
+            forKeys: [.fileSizeKey, .contentModificationDateKey]
+        )
+        guard let values else { return nil }
+        return FileSnapshot(size: values.fileSize ?? -1, modificationDate: values.contentModificationDate)
     }
 }
 

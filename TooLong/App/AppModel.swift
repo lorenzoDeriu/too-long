@@ -33,6 +33,8 @@ final class AppModel {
     @ObservationIgnored private let keychain: KeychainStore
     @ObservationIgnored private let autoImportService: AutoImportService
     @ObservationIgnored private var currentJob: Task<Void, Never>?
+    @ObservationIgnored private var autoImportQueue: [URL] = []
+    @ObservationIgnored private var jobGeneration = 0
 
     init(
         settings: AppSettings = AppSettings(),
@@ -49,13 +51,18 @@ final class AppModel {
         self.keychain = keychain
         self.autoImportService = autoImportService
         autoImportService.onNewFile = { [weak self] url in
-            self?.process(fileURL: url)
+            self?.enqueueAutoImport(url)
         }
 
         Task { [weak self] in
             await self?.loadHistory()
         }
 
+        // Resuming a previously-granted watch on launch doesn't need the folder picker again:
+        // the security-scoped bookmark already carries the user's consent for this folder, and
+        // it's what makes "remembered across launches" (see AppSettings) mean anything. Only
+        // *enabling* auto-import for the first time goes through `enableAutoImport()`, which
+        // always shows the picker since that's the only way to grant that consent initially.
         if settings.autoImportEnabled, let bookmark = settings.autoImportFolderBookmark {
             resumeAutoImport(bookmark: bookmark)
         }
@@ -103,9 +110,28 @@ final class AppModel {
 
     func process(fileURL: URL) {
         currentJob?.cancel()
+        jobGeneration += 1
+        let generation = jobGeneration
         currentJob = Task { [weak self] in
             await self?.runTranscription(fileURL: fileURL)
+            // Only drain the queue if no newer job has since superseded this one.
+            if self?.jobGeneration == generation {
+                self?.startNextAutoImportIfIdle()
+            }
         }
+    }
+
+    /// Queues a file discovered by `AutoImportService` instead of handing it straight to
+    /// `process(fileURL:)`, so a burst of files from one folder scan is processed one at a
+    /// time instead of each new arrival cancelling the transcription already in progress.
+    private func enqueueAutoImport(_ fileURL: URL) {
+        autoImportQueue.append(fileURL)
+        startNextAutoImportIfIdle()
+    }
+
+    private func startNextAutoImportIfIdle() {
+        guard !phase.isWorking, !autoImportQueue.isEmpty else { return }
+        process(fileURL: autoImportQueue.removeFirst())
     }
 
     func cancelCurrentJob() {
