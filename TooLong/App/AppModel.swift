@@ -31,23 +31,53 @@ final class AppModel {
     @ObservationIgnored private let recapService: AIRecapService
     @ObservationIgnored private let historyStore: HistoryStore
     @ObservationIgnored private let keychain: KeychainStore
+    @ObservationIgnored private let autoImportService: AutoImportService
+    @ObservationIgnored private let performTranscription: @Sendable (
+        URL,
+        TranscriptionLanguage,
+        @escaping LocalTranscriptionService.ProgressHandler
+    ) async throws -> TranscriptionResult
     @ObservationIgnored private var currentJob: Task<Void, Never>?
+    @ObservationIgnored private var autoImportQueue: [URL] = []
+    @ObservationIgnored private var jobGeneration = 0
 
     init(
         settings: AppSettings = AppSettings(),
         transcriber: LocalTranscriptionService = LocalTranscriptionService(),
         recapService: AIRecapService = AIRecapService(),
         historyStore: HistoryStore = HistoryStore(),
-        keychain: KeychainStore = KeychainStore()
+        keychain: KeychainStore = KeychainStore(),
+        autoImportService: AutoImportService = AutoImportService(),
+        performTranscription: (@Sendable (
+            URL,
+            TranscriptionLanguage,
+            @escaping LocalTranscriptionService.ProgressHandler
+        ) async throws -> TranscriptionResult)? = nil
     ) {
         self.settings = settings
         self.transcriber = transcriber
         self.recapService = recapService
         self.historyStore = historyStore
         self.keychain = keychain
+        self.autoImportService = autoImportService
+        self.performTranscription = performTranscription ?? { fileURL, language, progress in
+            try await transcriber.transcribe(fileURL: fileURL, language: language, progress: progress)
+        }
+        autoImportService.onNewFile = { [weak self] url in
+            self?.enqueueAutoImport(url)
+        }
 
         Task { [weak self] in
             await self?.loadHistory()
+        }
+
+        // Resuming a previously-granted watch on launch doesn't need the folder picker again:
+        // the security-scoped bookmark already carries the user's consent for this folder, and
+        // it's what makes "remembered across launches" (see AppSettings) mean anything. Only
+        // *enabling* auto-import for the first time goes through `enableAutoImport()`, which
+        // always shows the picker since that's the only way to grant that consent initially.
+        if settings.autoImportEnabled, let bookmark = settings.autoImportFolderBookmark {
+            resumeAutoImport(bookmark: bookmark)
         }
     }
 
@@ -55,30 +85,79 @@ final class AppModel {
         currentJob?.cancel()
     }
 
+    /// Presents a folder picker and, if the user chooses one, turns auto-import on for it.
+    /// Leaves auto-import off if the user cancels or the folder can't be watched.
+    func enableAutoImport() {
+        guard let (url, bookmark) = autoImportService.pickFolder() else { return }
+
+        settings.autoImportFolderBookmark = bookmark
+        settings.autoImportFolderName = url.lastPathComponent
+
+        let started = autoImportService.startWatching(bookmark: bookmark) { [weak settings] refreshed in
+            settings?.autoImportFolderBookmark = refreshed
+        }
+        settings.autoImportEnabled = started
+        if !started {
+            settings.autoImportFolderBookmark = nil
+            settings.autoImportFolderName = nil
+        }
+    }
+
+    func disableAutoImport() {
+        autoImportService.stopWatching()
+        settings.autoImportEnabled = false
+        settings.autoImportFolderBookmark = nil
+        settings.autoImportFolderName = nil
+    }
+
+    private func resumeAutoImport(bookmark: Data) {
+        let started = autoImportService.startWatching(bookmark: bookmark) { [weak settings] refreshed in
+            settings?.autoImportFolderBookmark = refreshed
+        }
+        if !started {
+            settings.autoImportEnabled = false
+            settings.autoImportFolderBookmark = nil
+            settings.autoImportFolderName = nil
+        }
+    }
+
     func process(fileURL: URL) {
-        currentJob?.cancel()
-        currentJob = Task { [weak self] in
+        startJob { [weak self] in
             await self?.runTranscription(fileURL: fileURL)
         }
     }
 
+    /// Queues a file discovered by `AutoImportService` instead of handing it straight to
+    /// `process(fileURL:)`, so a burst of files from one folder scan is processed one at a
+    /// time instead of each new arrival cancelling the transcription already in progress.
+    private func enqueueAutoImport(_ fileURL: URL) {
+        autoImportQueue.append(fileURL)
+        startNextAutoImportIfIdle()
+    }
+
+    private func startNextAutoImportIfIdle() {
+        guard currentJob == nil, !autoImportQueue.isEmpty else { return }
+        let nextFileURL = autoImportQueue.removeFirst()
+        startJob { [weak self] in
+            await self?.runTranscription(fileURL: nextFileURL)
+        }
+    }
+
     func cancelCurrentJob() {
-        currentJob?.cancel()
-        currentJob = nil
+        cancelActiveJob()
         phase = currentNote == nil ? .idle : .ready
         progress = 0
     }
 
     func makeRecap(includeReplyDraft: Bool? = nil) {
         guard currentNote != nil else { return }
-        currentJob?.cancel()
-        currentJob = Task { [weak self] in
+        startJob { [weak self] in
             await self?.runRecap(includeReplyDraft: includeReplyDraft)
         }
     }
 
     func select(_ note: VoiceNote) {
-        currentJob?.cancel()
+        cancelActiveJob()
         currentNote = note
         phase = .ready
         errorMessage = nil
@@ -86,12 +165,35 @@ final class AppModel {
     }
 
     func startOver() {
-        currentJob?.cancel()
+        cancelActiveJob()
         currentNote = nil
         phase = .idle
         progress = 0
         errorMessage = nil
         recapMessage = nil
+    }
+
+    private func startJob(_ operation: @escaping @MainActor () async -> Void) {
+        cancelActiveJob()
+        let generation = jobGeneration
+        currentJob = Task { [weak self] in
+            await operation()
+            await MainActor.run { [weak self] in
+                self?.finishCurrentJob(generation: generation)
+            }
+        }
+    }
+
+    private func cancelActiveJob() {
+        currentJob?.cancel()
+        currentJob = nil
+        jobGeneration += 1
+    }
+
+    private func finishCurrentJob(generation: Int) {
+        guard jobGeneration == generation else { return }
+        currentJob = nil
+        startNextAutoImportIfIdle()
     }
 
     func copyTranscript() {
@@ -140,9 +242,9 @@ final class AppModel {
         recapMessage = nil
 
         do {
-            let result = try await transcriber.transcribe(
-                fileURL: fileURL,
-                language: settings.language
+            let result = try await performTranscription(
+                fileURL,
+                settings.language
             ) { [weak self] value in
                 Task { @MainActor [weak self] in
                     self?.progress = value

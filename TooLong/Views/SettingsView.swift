@@ -18,6 +18,27 @@ struct SettingsView: View {
         ScrollView {
             GlassEffectContainer(spacing: 20) {
                 VStack(alignment: .leading, spacing: 22) {
+                    settingsSection("Auto-import", icon: "tray.and.arrow.down.fill") {
+                        Toggle("Watch a folder for new voice notes", isOn: autoImportBinding)
+
+                        if settings.autoImportEnabled {
+                            HStack {
+                                Label(settings.autoImportFolderName ?? "Chosen folder", systemImage: "folder.fill")
+                                    .font(.system(.callout, design: .rounded, weight: .semibold))
+                                Spacer()
+                                Button("Change folder…") { model.enableAutoImport() }
+                                    .buttonStyle(SoftButtonStyle())
+                            }
+                            Text("New audio or video files saved here—like a voice note saved from WhatsApp or Telegram—are imported automatically.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Off by default. Turning this on asks you to choose a folder—like Downloads—so Too Long can pick up voice notes saved there without a manual drag-and-drop.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     settingsSection("Listening", icon: "waveform") {
                         Picker("Voice note language", selection: $settings.language) {
                             ForEach(TranscriptionLanguage.allCases) { language in
@@ -99,6 +120,19 @@ struct SettingsView: View {
         }
         .onAppear { loadKey() }
         .onChange(of: settings.provider) { _, _ in loadKey() }
+    }
+
+    private var autoImportBinding: Binding<Bool> {
+        Binding(
+            get: { model.settings.autoImportEnabled },
+            set: { isOn in
+                if isOn {
+                    model.enableAutoImport()
+                } else {
+                    model.disableAutoImport()
+                }
+            }
+        )
     }
 
     private func settingsSection<Content: View>(

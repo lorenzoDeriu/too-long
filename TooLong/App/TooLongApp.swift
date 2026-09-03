@@ -2,14 +2,14 @@ import SwiftUI
 
 @main
 struct TooLongApp: App {
-    @State private var model = AppModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView()
-                .environment(model)
+                .environment(appDelegate.model)
         } label: {
-            Label("Too Long", systemImage: model.phase.isWorking ? "waveform" : "text.bubble.fill")
+            Label("Too Long", systemImage: appDelegate.model.phase.isWorking ? "waveform" : "text.bubble.fill")
         }
         .menuBarExtraStyle(.window)
     }
