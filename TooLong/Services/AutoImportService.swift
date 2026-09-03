@@ -21,7 +21,7 @@ final class AutoImportService {
     /// directory event when its entry first appears, not while its contents keep growing).
     private var stabilityRecheck: DispatchWorkItem?
 
-    private struct FileSnapshot: Equatable {
+    struct FileSnapshot: Equatable {
         let size: Int
         let modificationDate: Date?
     }
@@ -128,14 +128,33 @@ final class AutoImportService {
     /// retried on the next check instead of being imported (and marked as handled) mid-write.
     private func scanForNewFiles() {
         guard let accessedURL else { return }
-        let currentNames = Self.audioFileNames(in: accessedURL)
+        let stabilized = reconcileTrackedFiles(
+            currentNames: Self.audioFileNames(in: accessedURL)
+        ) { name in
+            Self.snapshot(of: name, in: accessedURL)
+        }
+
+        for name in stabilized {
+            knownFileNames.insert(name)
+            onNewFile?(accessedURL.appending(path: name))
+        }
+
+        scheduleStabilityRecheckIfNeeded()
+    }
+
+    @discardableResult
+    func reconcileTrackedFiles(
+        currentNames: Set<String>,
+        snapshot: (String) -> FileSnapshot?
+    ) -> [String] {
+        knownFileNames.formIntersection(currentNames)
 
         // Stop tracking anything that disappeared (renamed away, deleted) before stabilizing.
         pendingFiles = pendingFiles.filter { currentNames.contains($0.key) }
 
         var stabilized: [String] = []
         for (name, previousSnapshot) in pendingFiles {
-            guard let currentSnapshot = Self.snapshot(of: name, in: accessedURL) else {
+            guard let currentSnapshot = snapshot(name) else {
                 pendingFiles.removeValue(forKey: name)
                 continue
             }
@@ -147,19 +166,16 @@ final class AutoImportService {
             }
         }
 
+        knownFileNames.formUnion(stabilized)
+
         // Start tracking anything neither handled nor already pending. Take a baseline
         // snapshot only — it needs to survive unchanged into a later check to count as stable.
         let untracked = currentNames.subtracting(knownFileNames).subtracting(pendingFiles.keys)
         for name in untracked {
-            pendingFiles[name] = Self.snapshot(of: name, in: accessedURL)
+            pendingFiles[name] = snapshot(name)
         }
 
-        for name in stabilized.sorted() {
-            knownFileNames.insert(name)
-            onNewFile?(accessedURL.appending(path: name))
-        }
-
-        scheduleStabilityRecheckIfNeeded()
+        return stabilized.sorted()
     }
 
     /// Keeps polling while files are still stabilizing, since a file that's only growing in

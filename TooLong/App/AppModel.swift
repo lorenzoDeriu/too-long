@@ -32,6 +32,11 @@ final class AppModel {
     @ObservationIgnored private let historyStore: HistoryStore
     @ObservationIgnored private let keychain: KeychainStore
     @ObservationIgnored private let autoImportService: AutoImportService
+    @ObservationIgnored private let performTranscription: @Sendable (
+        URL,
+        TranscriptionLanguage,
+        @escaping LocalTranscriptionService.ProgressHandler
+    ) async throws -> TranscriptionResult
     @ObservationIgnored private var currentJob: Task<Void, Never>?
     @ObservationIgnored private var autoImportQueue: [URL] = []
     @ObservationIgnored private var jobGeneration = 0
@@ -42,7 +47,12 @@ final class AppModel {
         recapService: AIRecapService = AIRecapService(),
         historyStore: HistoryStore = HistoryStore(),
         keychain: KeychainStore = KeychainStore(),
-        autoImportService: AutoImportService = AutoImportService()
+        autoImportService: AutoImportService = AutoImportService(),
+        performTranscription: (@Sendable (
+            URL,
+            TranscriptionLanguage,
+            @escaping LocalTranscriptionService.ProgressHandler
+        ) async throws -> TranscriptionResult)? = nil
     ) {
         self.settings = settings
         self.transcriber = transcriber
@@ -50,6 +60,9 @@ final class AppModel {
         self.historyStore = historyStore
         self.keychain = keychain
         self.autoImportService = autoImportService
+        self.performTranscription = performTranscription ?? { fileURL, language, progress in
+            try await transcriber.transcribe(fileURL: fileURL, language: language, progress: progress)
+        }
         autoImportService.onNewFile = { [weak self] url in
             self?.enqueueAutoImport(url)
         }
@@ -109,15 +122,8 @@ final class AppModel {
     }
 
     func process(fileURL: URL) {
-        currentJob?.cancel()
-        jobGeneration += 1
-        let generation = jobGeneration
-        currentJob = Task { [weak self] in
+        startJob { [weak self] in
             await self?.runTranscription(fileURL: fileURL)
-            // Only drain the queue if no newer job has since superseded this one.
-            if self?.jobGeneration == generation {
-                self?.startNextAutoImportIfIdle()
-            }
         }
     }
 
@@ -130,27 +136,28 @@ final class AppModel {
     }
 
     private func startNextAutoImportIfIdle() {
-        guard !phase.isWorking, !autoImportQueue.isEmpty else { return }
-        process(fileURL: autoImportQueue.removeFirst())
+        guard currentJob == nil, !autoImportQueue.isEmpty else { return }
+        let nextFileURL = autoImportQueue.removeFirst()
+        startJob { [weak self] in
+            await self?.runTranscription(fileURL: nextFileURL)
+        }
     }
 
     func cancelCurrentJob() {
-        currentJob?.cancel()
-        currentJob = nil
+        cancelActiveJob()
         phase = currentNote == nil ? .idle : .ready
         progress = 0
     }
 
     func makeRecap(includeReplyDraft: Bool? = nil) {
         guard currentNote != nil else { return }
-        currentJob?.cancel()
-        currentJob = Task { [weak self] in
+        startJob { [weak self] in
             await self?.runRecap(includeReplyDraft: includeReplyDraft)
         }
     }
 
     func select(_ note: VoiceNote) {
-        currentJob?.cancel()
+        cancelActiveJob()
         currentNote = note
         phase = .ready
         errorMessage = nil
@@ -158,12 +165,35 @@ final class AppModel {
     }
 
     func startOver() {
-        currentJob?.cancel()
+        cancelActiveJob()
         currentNote = nil
         phase = .idle
         progress = 0
         errorMessage = nil
         recapMessage = nil
+    }
+
+    private func startJob(_ operation: @escaping @MainActor () async -> Void) {
+        cancelActiveJob()
+        let generation = jobGeneration
+        currentJob = Task { [weak self] in
+            await operation()
+            await MainActor.run { [weak self] in
+                self?.finishCurrentJob(generation: generation)
+            }
+        }
+    }
+
+    private func cancelActiveJob() {
+        currentJob?.cancel()
+        currentJob = nil
+        jobGeneration += 1
+    }
+
+    private func finishCurrentJob(generation: Int) {
+        guard jobGeneration == generation else { return }
+        currentJob = nil
+        startNextAutoImportIfIdle()
     }
 
     func copyTranscript() {
@@ -212,9 +242,9 @@ final class AppModel {
         recapMessage = nil
 
         do {
-            let result = try await transcriber.transcribe(
-                fileURL: fileURL,
-                language: settings.language
+            let result = try await performTranscription(
+                fileURL,
+                settings.language
             ) { [weak self] value in
                 Task { @MainActor [weak self] in
                     self?.progress = value

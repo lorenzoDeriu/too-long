@@ -107,6 +107,187 @@ final class AutoImportServiceTests: XCTestCase {
         let found = AutoImportService.audioFileNames(in: root)
         XCTAssertEqual(found, ["note.opus", "note.OGG", "note.m4a"])
     }
+
+    @MainActor
+    func testReconcileTrackedFilesDoesNotEmitStableFileTwice() {
+        let service = AutoImportService()
+        let snapshot = AutoImportService.FileSnapshot(size: 128, modificationDate: Date())
+
+        XCTAssertEqual(
+            service.reconcileTrackedFiles(currentNames: ["note.opus"]) { _ in snapshot },
+            []
+        )
+        XCTAssertEqual(
+            service.reconcileTrackedFiles(currentNames: ["note.opus"]) { _ in snapshot },
+            ["note.opus"]
+        )
+        XCTAssertEqual(
+            service.reconcileTrackedFiles(currentNames: ["note.opus"]) { _ in snapshot },
+            []
+        )
+    }
+
+    @MainActor
+    func testReconcileTrackedFilesForgetsDeletedFilesSoRecreatedNamesImportAgain() {
+        let service = AutoImportService()
+        let firstSnapshot = AutoImportService.FileSnapshot(size: 128, modificationDate: Date())
+        let secondSnapshot = AutoImportService.FileSnapshot(size: 256, modificationDate: Date().addingTimeInterval(1))
+
+        XCTAssertEqual(
+            service.reconcileTrackedFiles(currentNames: ["note.opus"]) { _ in firstSnapshot },
+            []
+        )
+        XCTAssertEqual(
+            service.reconcileTrackedFiles(currentNames: ["note.opus"]) { _ in firstSnapshot },
+            ["note.opus"]
+        )
+        XCTAssertEqual(
+            service.reconcileTrackedFiles(currentNames: []) { _ in nil },
+            []
+        )
+        XCTAssertEqual(
+            service.reconcileTrackedFiles(currentNames: ["note.opus"]) { _ in secondSnapshot },
+            []
+        )
+        XCTAssertEqual(
+            service.reconcileTrackedFiles(currentNames: ["note.opus"]) { _ in secondSnapshot },
+            ["note.opus"]
+        )
+    }
+}
+
+@MainActor
+final class AppModelAutoImportQueueTests: XCTestCase {
+    func testBurstAutoImportsRunSequentiallyInsteadOfCancellingEarlierFiles() async throws {
+        let settings = makeSettings()
+        let autoImportService = AutoImportService()
+        let startedFiles = StartedFiles()
+        let firstJob = TranscriptionGate()
+        let model = makeModel(
+            settings: settings,
+            autoImportService: autoImportService
+        ) { fileURL, _, progress in
+            progress(0.2)
+            await startedFiles.record(fileURL.lastPathComponent)
+            if fileURL.lastPathComponent == "one.opus" {
+                try await firstJob.wait()
+            }
+            progress(1)
+            return Self.result(transcript: fileURL.deletingPathExtension().lastPathComponent)
+        }
+        await settleModelStartup()
+
+        autoImportService.onNewFile?(URL(fileURLWithPath: "/tmp/one.opus"))
+        autoImportService.onNewFile?(URL(fileURLWithPath: "/tmp/two.opus"))
+        autoImportService.onNewFile?(URL(fileURLWithPath: "/tmp/three.opus"))
+
+        try await waitUntil("only the first auto-import should start immediately") {
+            await startedFiles.snapshot() == ["one.opus"]
+        }
+
+        await firstJob.release()
+
+        try await waitUntil("queued auto-imports should drain after the first finishes") {
+            await startedFiles.snapshot() == ["one.opus", "two.opus", "three.opus"]
+        }
+
+        try await waitUntil("recent notes should contain every imported file in reverse completion order") {
+            await MainActor.run {
+                model.recentNotes.map(\.fileName) == ["three.opus", "two.opus", "one.opus"]
+            }
+        }
+    }
+
+    func testQueuedAutoImportsWaitForManualProcessingToFinish() async throws {
+        let settings = makeSettings()
+        let autoImportService = AutoImportService()
+        let startedFiles = StartedFiles()
+        let manualJob = TranscriptionGate()
+        let model = makeModel(
+            settings: settings,
+            autoImportService: autoImportService
+        ) { fileURL, _, progress in
+            progress(0.2)
+            await startedFiles.record(fileURL.lastPathComponent)
+            if fileURL.lastPathComponent == "manual.opus" {
+                try await manualJob.wait()
+            }
+            progress(1)
+            return Self.result(transcript: fileURL.deletingPathExtension().lastPathComponent)
+        }
+        await settleModelStartup()
+
+        model.process(fileURL: URL(fileURLWithPath: "/tmp/manual.opus"))
+        autoImportService.onNewFile?(URL(fileURLWithPath: "/tmp/queued-one.opus"))
+        autoImportService.onNewFile?(URL(fileURLWithPath: "/tmp/queued-two.opus"))
+
+        try await waitUntil("manual processing should keep the queue blocked") {
+            await startedFiles.snapshot() == ["manual.opus"]
+        }
+
+        await manualJob.release()
+
+        try await waitUntil("queued imports should begin after the manual job completes") {
+            await startedFiles.snapshot() == ["manual.opus", "queued-one.opus", "queued-two.opus"]
+        }
+    }
+
+    private func makeModel(
+        settings: AppSettings,
+        autoImportService: AutoImportService,
+        performTranscription: @escaping @Sendable (
+            URL,
+            TranscriptionLanguage,
+            @escaping LocalTranscriptionService.ProgressHandler
+        ) async throws -> TranscriptionResult
+    ) -> AppModel {
+        let historyRoot = FileManager.default.temporaryDirectory
+            .appending(path: "TooLongTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let historyStore = HistoryStore(fileURL: historyRoot.appending(path: "history.json"))
+        return AppModel(
+            settings: settings,
+            historyStore: historyStore,
+            autoImportService: autoImportService,
+            performTranscription: performTranscription
+        )
+    }
+
+    private func makeSettings() -> AppSettings {
+        let suiteName = "TooLongTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let settings = AppSettings(defaults: defaults)
+        settings.automaticRecaps = false
+        settings.provider = .none
+        return settings
+    }
+
+    nonisolated private static func result(transcript: String) -> TranscriptionResult {
+        TranscriptionResult(
+            duration: 1,
+            transcript: transcript,
+            segments: [TranscriptSegment(startTime: 0, endTime: 1, text: transcript)],
+            language: .englishUS
+        )
+    }
+
+    private func waitUntil(
+        _ description: String,
+        attempts: Int = 200,
+        condition: @escaping @Sendable () async -> Bool
+    ) async throws {
+        for _ in 0..<attempts {
+            if await condition() { return }
+            await Task.yield()
+        }
+        XCTFail(description)
+    }
+
+    private func settleModelStartup() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
+    }
 }
 
 final class LocalTranscriptionIntegrationTests: XCTestCase {
@@ -265,5 +446,35 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
             data.append(buffer, count: count)
         }
         return data
+    }
+}
+
+private actor StartedFiles {
+    private var values: [String] = []
+
+    func record(_ value: String) {
+        values.append(value)
+    }
+
+    func snapshot() -> [String] {
+        values
+    }
+}
+
+private actor TranscriptionGate {
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var isReleased = false
+
+    func wait() async throws {
+        if isReleased { return }
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func release() {
+        isReleased = true
+        continuation?.resume()
+        continuation = nil
     }
 }
