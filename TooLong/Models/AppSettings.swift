@@ -14,6 +14,9 @@ final class AppSettings {
         static let openAIModel = "openAIModel"
         static let anthropicModel = "anthropicModel"
         static let forceDarkMode = "forceDarkMode"
+        static let autoImportEnabled = "autoImportEnabled"
+        static let autoImportFolderName = "autoImportFolderName"
+        static let autoImportFolderBookmark = "autoImportFolderBookmark"
     }
 
     private let defaults: UserDefaults
@@ -52,6 +55,19 @@ final class AppSettings {
         didSet { defaults.set(forceDarkMode, forKey: Key.forceDarkMode) }
     }
 
+    /// Off by default. Turning it on always goes through a manual folder pick—see `AutoImportService`.
+    var autoImportEnabled: Bool {
+        didSet { defaults.set(autoImportEnabled, forKey: Key.autoImportEnabled) }
+    }
+
+    var autoImportFolderName: String? {
+        didSet { defaults.set(autoImportFolderName, forKey: Key.autoImportFolderName) }
+    }
+
+    var autoImportFolderBookmark: Data? {
+        didSet { defaults.set(autoImportFolderBookmark, forKey: Key.autoImportFolderBookmark) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         provider = AIProvider(rawValue: defaults.string(forKey: Key.provider) ?? "") ?? .none
@@ -68,6 +84,9 @@ final class AppSettings {
         openAIModel = defaults.string(forKey: Key.openAIModel) ?? AIProvider.openAI.defaultModel
         anthropicModel = defaults.string(forKey: Key.anthropicModel) ?? AIProvider.anthropic.defaultModel
         forceDarkMode = defaults.object(forKey: Key.forceDarkMode) as? Bool ?? false
+        autoImportEnabled = defaults.object(forKey: Key.autoImportEnabled) as? Bool ?? false
+        autoImportFolderName = defaults.string(forKey: Key.autoImportFolderName)
+        autoImportFolderBookmark = defaults.data(forKey: Key.autoImportFolderBookmark)
     }
 
     var selectedModel: String {

@@ -14,6 +14,8 @@
 		2F62549CFA2446CDAD77F0FD /* VoiceNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E1FE7B19173F4973C68A38 /* VoiceNote.swift */; };
 		32AA3EFD69B48BEF354EF140 /* AIRecapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0844FD17898AFF24447524E /* AIRecapService.swift */; };
 		37ED5CD7DE32685BFB39D4EB /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19AE7C2BF565159F2BED96B7 /* KeychainStore.swift */; };
+		3B810A27162CBB20364F49F6 /* AutoImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD73F6AAA071ED7619435CE /* AutoImportService.swift */; };
+		4589DCBCCF5B072EB97C95AD /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DBFC2B346AAD340C50807B3 /* AppDelegate.swift */; };
 		5EF0677C844A846D137BA4BF /* JetBrainsMono-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B0A01127CD3F4E17E822A91A /* JetBrainsMono-Bold.ttf */; };
 		67B39B55ACB4FC86E20B9800 /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F5C8688BD3039E561E3D9B /* ResultView.swift */; };
 		8C2CF99C8CBFF747C8C95D8C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F2734A5F0922E91D565E51C /* SettingsView.swift */; };
@@ -44,6 +46,7 @@
 		19AE7C2BF565159F2BED96B7 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		1A1ED496BE52CE3C5C18E3B2 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
 		1D2139C50AD6216603902759 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2DBFC2B346AAD340C50807B3 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		403C8BFF3E23D4AF5D4E152D /* TooLongApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooLongApp.swift; sourceTree = "<group>"; };
 		47E1FE7B19173F4973C68A38 /* VoiceNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNote.swift; sourceTree = "<group>"; };
 		56D39C7C69A150B7E69614C3 /* JetBrainsMono-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-SemiBold.ttf"; sourceTree = "<group>"; };
@@ -66,6 +69,7 @@
 		E0844FD17898AFF24447524E /* AIRecapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRecapService.swift; sourceTree = "<group>"; };
 		F2FAF5239F7AAA463DA0C5FB /* TooLongTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooLongTests.swift; sourceTree = "<group>"; };
 		F6C61CC741CD43DD96D9FC2D /* TooLong.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TooLong.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FCD73F6AAA071ED7619435CE /* AutoImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoImportService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -81,6 +85,7 @@
 		519BF8FF4FA7D44A96AAF92D /* App */ = {
 			isa = PBXGroup;
 			children = (
+				2DBFC2B346AAD340C50807B3 /* AppDelegate.swift */,
 				A4B2F8AADA5FE44F65C08052 /* AppModel.swift */,
 				403C8BFF3E23D4AF5D4E152D /* TooLongApp.swift */,
 			);
@@ -157,6 +162,7 @@
 			isa = PBXGroup;
 			children = (
 				E0844FD17898AFF24447524E /* AIRecapService.swift */,
+				FCD73F6AAA071ED7619435CE /* AutoImportService.swift */,
 				90D66D0BEBAD02F94EDAB215 /* HistoryStore.swift */,
 				19AE7C2BF565159F2BED96B7 /* KeychainStore.swift */,
 				9A98F998865C5A4E7FC48C24 /* LocalTranscriptionService.swift */,
@@ -282,8 +288,10 @@
 			files = (
 				949E0B0A0A3300B271E0B2BB /* AIProvider.swift in Sources */,
 				32AA3EFD69B48BEF354EF140 /* AIRecapService.swift in Sources */,
+				4589DCBCCF5B072EB97C95AD /* AppDelegate.swift in Sources */,
 				AA339C13883A5CB943E9213C /* AppModel.swift in Sources */,
 				0C42E4B37E797073E541BE82 /* AppSettings.swift in Sources */,
+				3B810A27162CBB20364F49F6 /* AutoImportService.swift in Sources */,
 				F04C30F1BF7A926D475B26C0 /* Brand.swift in Sources */,
 				C7E4E3D38F450C84A822F7BB /* HistoryStore.swift in Sources */,
 				37ED5CD7DE32685BFB39D4EB /* KeychainStore.swift in Sources */,

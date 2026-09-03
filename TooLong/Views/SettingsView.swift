@@ -19,20 +19,55 @@ struct SettingsView: View {
 
         ScrollView {
             GlassEffectContainer(spacing: 20) {
-            VStack(alignment: .leading, spacing: 20) {
-                settingsSection("Appearance", icon: "circle.righthalf.filled", t: t) {
-                    Toggle("Dark mode", isOn: $settings.forceDarkMode)
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .tint(TooLongPalette.accent)
-                        .font(TooLongFont.mono(12.5))
-                        .foregroundStyle(t.ink)
-                    Text("Off follows the system appearance. Turn it on to keep Too Long dark whatever macOS is doing.")
-                        .font(TooLongFont.mono(11))
-                        .foregroundStyle(t.ink3)
-                }
+                VStack(alignment: .leading, spacing: 20) {
+                    settingsSection("Appearance", icon: "circle.righthalf.filled", t: t) {
+                        Toggle("Dark mode", isOn: $settings.forceDarkMode)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .tint(TooLongPalette.accent)
+                            .font(TooLongFont.mono(12.5))
+                            .foregroundStyle(t.ink)
+                        Text("Off follows the system appearance. Turn it on to keep Too Long dark whatever macOS is doing.")
+                            .font(TooLongFont.mono(11))
+                            .foregroundStyle(t.ink3)
+                    }
 
-                settingsSection("Listening", icon: "waveform", t: t) {
+                    settingsSection("Auto-import", icon: "tray.and.arrow.down.fill", t: t) {
+                        Toggle("Watch a folder for new voice notes", isOn: autoImportBinding)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .tint(TooLongPalette.accent)
+                            .font(TooLongFont.mono(12.5))
+                            .foregroundStyle(t.ink)
+
+                        if settings.autoImportEnabled {
+                            HStack {
+                                Label(settings.autoImportFolderName ?? "Chosen folder", systemImage: "folder.fill")
+                                    .font(TooLongFont.mono(12, weight: .medium))
+                                    .foregroundStyle(t.ink)
+                                Spacer()
+                                Button {
+                                    model.enableAutoImport()
+                                } label: {
+                                    Label("Change folder…", systemImage: "folder")
+                                }
+                                .buttonStyle(.glass)
+                                .buttonBorderShape(.capsule)
+                                .controlSize(.large)
+                                .font(TooLongFont.mono(11, weight: .medium))
+                                .imageScale(.small)
+                            }
+                            Text("New audio or video files saved here—like a voice note saved from WhatsApp or Telegram—are imported automatically.")
+                                .font(TooLongFont.mono(11))
+                                .foregroundStyle(t.ink3)
+                        } else {
+                            Text("Off by default. Turning this on asks you to choose a folder—like Downloads—so Too Long can pick up voice notes saved there without a manual drag-and-drop.")
+                                .font(TooLongFont.mono(11))
+                                .foregroundStyle(t.ink3)
+                        }
+                    }
+
+                    settingsSection("Listening", icon: "waveform", t: t) {
                     Picker("Voice note language", selection: $settings.language) {
                         ForEach(TranscriptionLanguage.allCases) { language in
                             Text(language.displayName).tag(language)
@@ -164,6 +199,19 @@ struct SettingsView: View {
         .scrollIndicators(.never)
         .onAppear { loadKey() }
         .onChange(of: settings.provider) { _, _ in loadKey() }
+    }
+
+    private var autoImportBinding: Binding<Bool> {
+        Binding(
+            get: { model.settings.autoImportEnabled },
+            set: { isOn in
+                if isOn {
+                    model.enableAutoImport()
+                } else {
+                    model.disableAutoImport()
+                }
+            }
+        )
     }
 
     private func settingsSection<Content: View>(
