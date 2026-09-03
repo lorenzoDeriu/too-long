@@ -26,6 +26,10 @@ final class AppModel {
     var recentNotes: [VoiceNote] = []
     var errorMessage: String?
     var recapMessage: String?
+    /// Whether the popover is currently showing Settings in place of the
+    /// normal content. Lives here (rather than as view-local state) so any
+    /// view can request navigation to Settings, not just the header.
+    var showSettings = false
 
     @ObservationIgnored private let transcriber: LocalTranscriptionService
     @ObservationIgnored private let recapService: AIRecapService
@@ -162,6 +166,15 @@ final class AppModel {
         phase = .ready
         errorMessage = nil
         recapMessage = nil
+        showSettings = false
+    }
+
+    func openSettings() {
+        showSettings = true
+    }
+
+    func closeSettings() {
+        showSettings = false
     }
 
     func startOver() {

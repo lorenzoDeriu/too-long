@@ -8,6 +8,7 @@ struct TooLongApp: App {
         MenuBarExtra {
             MenuBarContentView()
                 .environment(appDelegate.model)
+                .preferredColorScheme(appDelegate.model.settings.forceDarkMode ? .dark : nil)
         } label: {
             Label("Too Long", systemImage: appDelegate.model.phase.isWorking ? "waveform" : "text.bubble.fill")
         }

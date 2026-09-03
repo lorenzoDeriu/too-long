@@ -13,6 +13,7 @@ final class AppSettings {
         static let languageSelectionVersion = "transcriptionLanguageSelectionVersion"
         static let openAIModel = "openAIModel"
         static let anthropicModel = "anthropicModel"
+        static let forceDarkMode = "forceDarkMode"
         static let autoImportEnabled = "autoImportEnabled"
         static let autoImportFolderName = "autoImportFolderName"
         static let autoImportFolderBookmark = "autoImportFolderBookmark"
@@ -48,6 +49,12 @@ final class AppSettings {
         didSet { defaults.set(anthropicModel, forKey: Key.anthropicModel) }
     }
 
+    /// When on, keeps Too Long dark regardless of the system appearance.
+    /// Off (the default) follows macOS.
+    var forceDarkMode: Bool {
+        didSet { defaults.set(forceDarkMode, forKey: Key.forceDarkMode) }
+    }
+
     /// Off by default. Turning it on always goes through a manual folder pick—see `AutoImportService`.
     var autoImportEnabled: Bool {
         didSet { defaults.set(autoImportEnabled, forKey: Key.autoImportEnabled) }
@@ -76,6 +83,7 @@ final class AppSettings {
         }
         openAIModel = defaults.string(forKey: Key.openAIModel) ?? AIProvider.openAI.defaultModel
         anthropicModel = defaults.string(forKey: Key.anthropicModel) ?? AIProvider.anthropic.defaultModel
+        forceDarkMode = defaults.object(forKey: Key.forceDarkMode) as? Bool ?? false
         autoImportEnabled = defaults.object(forKey: Key.autoImportEnabled) as? Bool ?? false
         autoImportFolderName = defaults.string(forKey: Key.autoImportFolderName)
         autoImportFolderBookmark = defaults.data(forKey: Key.autoImportFolderBookmark)

@@ -4,44 +4,48 @@ import UniformTypeIdentifiers
 
 struct MenuBarContentView: View {
     @Environment(AppModel.self) private var model
-    @State private var showSettings = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
             LiquidBackdrop()
 
+            // Scrolling content sits behind the header/footer so it visibly
+            // passes underneath their translucent glass as it scrolls.
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
             GlassEffectContainer(spacing: 14) {
                 VStack(spacing: 0) {
                     header
-
-                    Group {
-                        if showSettings {
-                            SettingsView()
-                                .transition(.move(edge: .trailing).combined(with: .opacity))
-                        } else if let note = model.currentNote {
-                            ResultView(note: note, openSettings: openSettings)
-                        } else {
-                            switch model.phase {
-                            case .detectingLanguage, .transcribing, .recapping:
-                                ProcessingView()
-                            case .failed:
-                                FailureView()
-                            case .idle, .ready:
-                                EmptyStateView(
-                                    chooseFile: chooseFile,
-                                    processFile: { model.process(fileURL: $0) }
-                                )
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-
+                    Spacer(minLength: 0)
                     footer
                 }
             }
         }
         .frame(width: 420, height: 620)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if model.showSettings {
+            SettingsView()
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+        } else if let note = model.currentNote {
+            ResultView(note: note)
+        } else {
+            switch model.phase {
+            case .detectingLanguage, .transcribing, .recapping:
+                ProcessingView()
+            case .failed:
+                FailureView()
+            case .idle, .ready:
+                EmptyStateView(
+                    chooseFile: chooseFile,
+                    processFile: { model.process(fileURL: $0) }
+                )
+            }
+        }
     }
 
     private func chooseFile() {
@@ -59,98 +63,100 @@ struct MenuBarContentView: View {
         model.process(fileURL: url)
     }
 
-    private func openSettings() {
-        withAnimation(.easeInOut(duration: 0.2)) { showSettings = true }
+    private func goHome() {
+        if model.showSettings {
+            withAnimation(.easeInOut(duration: 0.18)) { model.closeSettings() }
+        } else if model.currentNote != nil || model.phase != .idle {
+            model.startOver()
+        }
     }
 
-    private func closeSettings() {
-        withAnimation(.easeInOut(duration: 0.2)) { showSettings = false }
+    private func openSettings() {
+        withAnimation(.easeInOut(duration: 0.18)) { model.openSettings() }
     }
 
     private var header: some View {
-        HStack(spacing: 11) {
-            if showSettings {
-                Button(action: closeSettings) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                .buttonStyle(.glass)
-                .help("Back")
+        let t = TooLongPalette.tokens(for: colorScheme)
+        return HStack(spacing: 10) {
+            Button(action: goHome) {
+                HStack(spacing: 10) {
+                    AppLogoImage(height: 19)
 
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Settings")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
-                    Text("Set up your way")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                TinyWaveform(active: model.phase.isWorking)
-
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Too Long")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
-                    Text("for voice notes that got away")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(model.showSettings ? "Settings" : "Too Long")
+                            .font(TooLongFont.heading(15))
+                            .foregroundStyle(t.ink)
+                        Text(model.showSettings ? "Set up your way" : "for voice notes that got away")
+                            .font(TooLongFont.mono(10.5))
+                            .foregroundStyle(t.ink3)
+                    }
+                    .animation(nil, value: model.showSettings)
                 }
             }
+            .buttonStyle(.plain)
 
             Spacer()
 
-            if !showSettings {
-                if !model.recentNotes.isEmpty {
-                    Menu {
-                        ForEach(model.recentNotes.prefix(8)) { note in
-                            Button {
-                                model.select(note)
-                            } label: {
-                                Text(note.fileName)
-                                Text(note.createdAt, style: .relative)
-                            }
+            if !model.recentNotes.isEmpty {
+                Menu {
+                    ForEach(model.recentNotes.prefix(8)) { note in
+                        Button {
+                            model.select(note)
+                        } label: {
+                            Text(note.fileName)
+                            Text(note.createdAt, style: .relative)
                         }
-                    } label: {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 15, weight: .semibold))
                     }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                    .help("Recent voice notes")
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 13, weight: .semibold))
                 }
-
-                Button(action: openSettings) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                }
+                .menuStyle(.borderlessButton)
                 .buttonStyle(.glass)
-                .help("Settings")
+                .buttonBorderShape(.circle)
+                .fixedSize()
+                .help("Recent voice notes")
             }
+
+            Button(action: openSettings) {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .tint(model.showSettings ? TooLongPalette.accent : nil)
+            .help("Settings")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .liquidPanel(tint: TooLongStyle.surface.opacity(0.10), cornerRadius: 20)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
+        .liquidPanel(cornerRadius: 18)
         .padding(.horizontal, 12)
         .padding(.top, 10)
     }
 
     private var footer: some View {
-        HStack {
+        let t = TooLongPalette.tokens(for: colorScheme)
+        return HStack {
             Label("Audio stays on this Mac", systemImage: "lock.fill")
-                .font(.system(.caption2, design: .rounded, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(TooLongFont.mono(10, weight: .medium))
+                .foregroundStyle(t.ink3)
 
             Spacer()
 
-            Button("Quit") {
+            Button {
                 NSApplication.shared.terminate(nil)
+            } label: {
+                Label("Quit", systemImage: "power")
             }
-            .buttonStyle(.plain)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .font(TooLongFont.mono(12, weight: .medium))
+            .imageScale(.small)
         }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 9)
-        .liquidPanel(tint: TooLongStyle.surface.opacity(0.08), cornerRadius: 16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .liquidPanel(cornerRadius: 16)
         .padding(.horizontal, 12)
         .padding(.bottom, 10)
     }
@@ -159,49 +165,48 @@ struct MenuBarContentView: View {
 private struct EmptyStateView: View {
     let chooseFile: () -> Void
     let processFile: (URL) -> Void
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isDropTargeted = false
 
     var body: some View {
+        let t = TooLongPalette.tokens(for: colorScheme)
         VStack(spacing: 22) {
             Spacer()
 
             VStack(spacing: 17) {
-                Image(systemName: "waveform.badge.plus")
-                    .font(.system(size: 39, weight: .medium))
-                    .foregroundStyle(TooLongStyle.tomato)
-                    .padding(15)
-                    .glassEffect(
-                        .clear.tint(TooLongStyle.tomato.opacity(0.12)),
-                        in: Circle()
-                    )
+                IconBadge(systemImage: "waveform.badge.plus", size: 64, cornerRadius: 20, glass: false)
 
                 VStack(spacing: 7) {
                     Text("Drop the long version.")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(TooLongFont.heading(22))
+                        .foregroundStyle(t.ink)
                     Text("A voice note goes in.\nThe useful bits come out.")
                         .multilineTextAlignment(.center)
-                        .font(.system(.body, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .font(TooLongFont.mono(12.5))
+                        .foregroundStyle(t.ink2)
                 }
 
-                Button("Choose a voice note", action: chooseFile)
-                    .buttonStyle(PrimaryButtonStyle())
+                Button(action: chooseFile) {
+                    Label("Choose a voice note", systemImage: "folder")
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
+                .tint(TooLongPalette.accent)
+                .font(TooLongFont.mono(12.5, weight: .medium))
+                .imageScale(.small)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(28)
-            .liquidPanel(
-                tint: isDropTargeted ? TooLongStyle.tomato.opacity(0.20) : nil,
-                cornerRadius: 34,
-                interactive: true
-            )
+            .liquidPanel(cornerRadius: 24)
             .overlay {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .strokeBorder(
-                        isDropTargeted ? TooLongStyle.tomato.opacity(0.85) : .primary.opacity(0.10),
-                        style: StrokeStyle(lineWidth: 1.5, dash: [7, 7])
+                        isDropTargeted ? TooLongPalette.accent.opacity(0.85) : t.dash,
+                        style: StrokeStyle(lineWidth: 1, dash: [7, 7])
                     )
             }
-            .frame(height: 330)
+            .frame(height: 326)
             .dropDestination(for: URL.self) { urls, _ in
                 guard let url = urls.first else { return false }
                 processFile(url)
@@ -212,52 +217,69 @@ private struct EmptyStateView: View {
 
             VStack(spacing: 4) {
                 Label("Transcribed locally", systemImage: "apple.logo")
-                    .font(.system(.callout, design: .rounded, weight: .semibold))
+                    .font(TooLongFont.mono(11.5, weight: .medium))
+                    .foregroundStyle(t.ink)
                 Text("No account. No upload. No drama.")
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .font(TooLongFont.mono(11))
+                    .foregroundStyle(t.ink3)
             }
 
             Spacer()
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 22)
     }
 }
 
 private struct ProcessingView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(spacing: 24) {
+        let t = TooLongPalette.tokens(for: colorScheme)
+        VStack(spacing: 22) {
             Spacer()
-            TinyWaveform(active: true)
-                .scaleEffect(1.7)
+            IconBadge(systemImage: "waveform", size: 60, cornerRadius: 20, glass: false)
 
-            VStack(spacing: 7) {
+            VStack(spacing: 6) {
                 Text(processingTitle)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(TooLongFont.heading(20))
+                    .foregroundStyle(t.ink)
                 Text(processingDetail)
-                    .font(.system(.callout, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .font(TooLongFont.mono(12.5))
+                    .foregroundStyle(t.ink2)
                     .multilineTextAlignment(.center)
             }
 
             if model.phase == .transcribing || model.phase == .detectingLanguage {
-                ProgressView(value: model.progress)
-                    .progressViewStyle(.linear)
-                    .tint(TooLongStyle.tomato)
-                    .frame(width: 230)
+                VStack(spacing: 7) {
+                    ProgressView(value: model.progress)
+                        .progressViewStyle(.linear)
+                        .tint(TooLongPalette.accent)
+                        .frame(width: 222)
+                    Text("\(Int(model.progress * 100)) %")
+                        .font(TooLongFont.mono(10, weight: .medium))
+                        .foregroundStyle(t.ink3)
+                }
             } else {
                 ProgressView()
                     .controlSize(.small)
             }
 
-            Button("Stop") { model.cancelCurrentJob() }
-                .buttonStyle(SoftButtonStyle())
+            Button {
+                model.cancelCurrentJob()
+            } label: {
+                Label("Stop", systemImage: "stop.fill")
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .font(TooLongFont.mono(12, weight: .medium))
+            .imageScale(.small)
             Spacer()
         }
         .padding(28)
-        .liquidPanel(cornerRadius: 30)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .liquidPanel(cornerRadius: 24)
         .padding(24)
     }
 
@@ -280,25 +302,37 @@ private struct ProcessingView: View {
 
 private struct FailureView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let t = TooLongPalette.tokens(for: colorScheme)
         VStack(spacing: 18) {
             Spacer()
-            Image(systemName: "waveform.slash")
-                .font(.system(size: 43))
-                .foregroundStyle(TooLongStyle.tomato)
+            IconBadge(systemImage: "waveform.slash", size: 60, cornerRadius: 20, glass: false)
             Text("That one didn't land.")
-                .font(.system(size: 23, weight: .bold, design: .rounded))
+                .font(TooLongFont.heading(20))
+                .foregroundStyle(t.ink)
             Text(model.errorMessage ?? "Try another audio file.")
-                .foregroundStyle(.secondary)
+                .font(TooLongFont.mono(12.5))
+                .foregroundStyle(t.ink2)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 300)
-            Button("Try another voice note") { model.startOver() }
-                .buttonStyle(PrimaryButtonStyle())
+                .frame(maxWidth: 290)
+            Button {
+                model.startOver()
+            } label: {
+                Label("Try another voice note", systemImage: "arrow.counterclockwise")
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .tint(TooLongPalette.accent)
+            .font(TooLongFont.mono(12.5, weight: .medium))
+            .imageScale(.small)
             Spacer()
         }
         .padding(28)
-        .liquidPanel(tint: TooLongStyle.tomato.opacity(0.08), cornerRadius: 30)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .liquidPanel(cornerRadius: 24)
         .padding(24)
     }
 }
